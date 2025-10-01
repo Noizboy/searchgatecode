@@ -1,0 +1,64 @@
+[
+    {
+        "community": "Water Oaks",
+        "codes": [
+            {
+                "code": "#54839",
+                "notes": "Main entrance keypad",
+                "details": "Keypad on the left pillar after the visitor lane. Gate closes fast; keep the van close.",
+                "photo": "/gatecodes/assets/gate-call-box-residential.jpg"
+            },
+            {
+                "code": "#1177*",
+                "notes": "Back door",
+                "details": "testing",
+                "photo": "/gatecodes/assets/gate_20250929_052342_9f84b2.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Maple Ridge",
+        "codes": [
+            {
+                "code": "#4578",
+                "notes": "Keypad at left lane",
+                "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
+                "photo": "/gatecodes/assets/gate_20250929_042204_1580ac.jpg"
+            },
+            {
+                "code": "#4579",
+                "notes": "Back gate (contractors)",
+                "details": "Back entrance used by contractors. Keypad on a short pole; visibility is low at night.",
+                "photo": "/gatecodes/assets/gate_20250929_042204_85bd3b.jpg"
+            }
+        ]
+    },
+    {
+        "community": "yarey",
+        "codes": [
+            {
+                "code": "2453",
+                "notes": "yarey",
+                "details": "yareyyareyyareyyarey yarey yarey",
+                "photo": "assets/gate-call-box-residential.jpg"
+            },
+            {
+                "code": "#1177*",
+                "notes": "3456456",
+                "details": "54657 fgh fgh",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "santo domingo",
+        "codes": [
+            {
+                "code": "34564564",
+                "notes": "main",
+                "details": "ffgh345234",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    }
+]
