@@ -6,13 +6,7 @@
                 "code": "#54839",
                 "notes": "Main entrance keypad",
                 "details": "Keypad on the left pillar after the visitor lane. Gate closes fast; keep the van close.",
-                "photo": "/gatecodes/assets/gate-call-box-residential.jpg"
-            },
-            {
-                "code": "#1177*",
-                "notes": "Back door",
-                "details": "testing",
-                "photo": "/gatecodes/assets/gate_20250929_052342_9f84b2.jpg"
+                "photo": "assets/gate-call-box-residential.jpg"
             }
         ]
     },
@@ -23,13 +17,13 @@
                 "code": "#4578",
                 "notes": "Keypad at left lane",
                 "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
-                "photo": "/gatecodes/assets/gate_20250929_042204_1580ac.jpg"
+                "photo": "/assets/gate_20250928_212518_038e2e.jpg"
             },
             {
                 "code": "#4579",
                 "notes": "Back gate (contractors)",
                 "details": "Back entrance used by contractors. Keypad on a short pole; visibility is low at night.",
-                "photo": "/gatecodes/assets/gate_20250929_042204_85bd3b.jpg"
+                "photo": "/assets/gate_20250928_212518_a02373.jpg"
             }
         ]
     },
@@ -57,6 +51,269 @@
                 "code": "34564564",
                 "notes": "main",
                 "details": "ffgh345234",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Enclave at harden - Lakeland",
+        "codes": [
+            {
+                "code": "*1143",
+                "notes": "Main Gate",
+                "photo": "/assets/gate_20251001_114322_1e545c.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Cordgrass",
+        "codes": [
+            {
+                "code": "1925#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Silver Dr (Merganser)",
+        "codes": [
+            {
+                "code": "#5434",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Evergreen",
+        "codes": [
+            {
+                "code": "1991#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Royal Reserve",
+        "codes": [
+            {
+                "code": "1825",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Heritage",
+        "codes": [
+            {
+                "code": "2001",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Hickory Leaf",
+        "codes": [
+            {
+                "code": "1221* OR",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Indian Sky Creek",
+        "codes": [
+            {
+                "code": "#9339",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Highland in the Woods",
+        "codes": [
+            {
+                "code": "2020#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Highland Oak",
+        "codes": [
+            {
+                "code": "2525#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Silver Leaf W",
+        "codes": [
+            {
+                "code": "1221#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Highland in the Wood St",
+        "codes": [
+            {
+                "code": "0809",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Christina Chase",
+        "codes": [
+            {
+                "code": "#6271 OR #6221",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Ashton Woods",
+        "codes": [
+            {
+                "code": "9842",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Aston Oak",
+        "codes": [
+            {
+                "code": "1960",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Cresen Wood",
+        "codes": [
+            {
+                "code": "4545",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Millbroke/Millbrook",
+        "codes": [
+            {
+                "code": "#9030",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Cresen/Crescent Hills",
+        "codes": [
+            {
+                "code": "#9687",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Cresen/Crescent Oaks",
+        "codes": [
+            {
+                "code": "1276",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Tiffany Oak",
+        "codes": [
+            {
+                "code": "#4470",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Amanda Oaks",
+        "codes": [
+            {
+                "code": "#3710 OR #3700",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Christina Lake",
+        "codes": [
+            {
+                "code": "1557#",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Lake Clark",
+        "codes": [
+            {
+                "code": "#8578",
+                "notes": "Main entrance",
+                "details": "",
+                "photo": "assets/gate-call-box-residential.jpg"
+            }
+        ]
+    },
+    {
+        "community": "Gandhi Dr",
+        "codes": [
+            {
+                "code": "0822#",
+                "notes": "Main entrance",
+                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ]
