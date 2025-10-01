@@ -132,7 +132,7 @@
 </head>
 <body>
   <main>
-    <h1 id="title" class="title">Gate Code</h1>
+    <h1 id="title" class="title">Search Gate Codes</h1>
     <div class="sub">Search community gate codes</div>
 
     <form class="search" id="searchForm" role="search" aria-label="Community search">
