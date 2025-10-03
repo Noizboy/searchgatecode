@@ -116,29 +116,84 @@ function delete_photo_by_url($url){
 /******************** AJAX: UPLOAD (single-row) ********************/
 if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
   header('Content-Type: application/json');
-  $res = ['status'=>'fail','url'=>null,'error'=>null,'limits'=>[
-    'file_uploads'=>ini_get('file_uploads'),
-    'upload_max_filesize'=>ini_get('upload_max_filesize'),
-    'post_max_size'=>ini_get('post_max_size'),
-    'max_file_uploads'=>ini_get('max_file_uploads'),
-    'upload_tmp_dir'=>ini_get('upload_tmp_dir'),
-  ]];
-  if (!isset($_FILES['photo'])) { echo json_encode($res + ['error'=>'no_file']); exit; }
-  if (!is_dir(ASSETS_DIR)) @mkdir(ASSETS_DIR,0775,true);
-  if (!is_writable(ASSETS_DIR)) { echo json_encode($res + ['error'=>'assets_not_writable']); exit; }
 
-  $err = $_FILES['photo']['error'];
-  $tmp = $_FILES['photo']['tmp_name'] ?? '';
-  if ($err !== UPLOAD_ERR_OK) { echo json_encode($res + ['error'=>"php_err_$err"]); exit; }
-  if (!is_uploaded_file($tmp)) { echo json_encode($res + ['error'=>'invalid_tmp']); exit; }
-  $mime = @mime_content_type($tmp);
-  $ext  = $mime==='image/png'?'png':($mime==='image/jpeg'?'jpg':'');
-  if(!$ext){ echo json_encode($res + ['error'=>"type_$mime_not_allowed"]); exit; }
-  $fname='gate_'.date('Ymd_His').'_'.bin2hex(random_bytes(3)).'.'.$ext;
-  if (!@move_uploaded_file($tmp, ASSETS_DIR.$fname)) {
-    echo json_encode($res + ['error'=>'move_failed']); exit;
+  $MAX_BYTES = 16 * 1024 * 1024;
+
+  $out = function($status, $extra = []) {
+    http_response_code($status === 'ok' ? 200 : (http_response_code() ?: 400));
+    echo json_encode(array_merge(['status'=>$status], $extra));
+    exit;
+  };
+
+  if (!isset($_FILES['photo'])) $out('fail', ['error'=>'no_file']);
+
+  $f = $_FILES['photo'];
+  if ($f['error'] !== UPLOAD_ERR_OK) {
+    $map = [
+      UPLOAD_ERR_INI_SIZE   => 'php_err_ini_size',
+      UPLOAD_ERR_FORM_SIZE  => 'php_err_form_size',
+      UPLOAD_ERR_PARTIAL    => 'php_err_partial',
+      UPLOAD_ERR_NO_FILE    => 'php_err_no_file',
+      UPLOAD_ERR_NO_TMP_DIR => 'php_err_no_tmp_dir',
+      UPLOAD_ERR_CANT_WRITE => 'php_err_cant_write',
+      UPLOAD_ERR_EXTENSION  => 'php_err_extension'
+    ];
+    $code = $map[$f['error']] ?? ('php_err_'.$f['error']);
+    if (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) { http_response_code(413); }
+    $out('fail', ['error'=>$code]);
   }
-  echo json_encode(['status'=>'ok','url'=>ASSETS_URL.$fname]);
+
+  if ($f['size'] > $MAX_BYTES) { http_response_code(413); $out('fail', ['error'=>'too_large']); }
+
+  if (!is_dir(ASSETS_DIR) && !@mkdir(ASSETS_DIR, 0775, true)) $out('fail', ['error'=>'assets_dir_create_failed']);
+  if (!is_writable(ASSETS_DIR)) $out('fail', ['error'=>'assets_not_writable']);
+
+  $tmp  = $f['tmp_name'];
+  if (!is_uploaded_file($tmp)) $out('fail', ['error'=>'invalid_tmp']);
+
+  $finfo = new finfo(FILEINFO_MIME_TYPE);
+  $mime = $finfo->file($tmp) ?: 'application/octet-stream';
+
+  $allowed_native = ['image/jpeg','image/png','image/webp'];
+  $needs_convert  = ['image/heic','image/heif'];
+
+  $base = 'gate_'.date('Ymd_His').'_'.bin2hex(random_bytes(3));
+  $dest = '';
+
+  if (in_array($mime, $needs_convert, true)) {
+    if (class_exists('Imagick')) {
+      try {
+        $img = new Imagick($tmp);
+        if (method_exists($img, 'setImageOrientation')) { $img->setImageOrientation(\Imagick::ORIENTATION_TOPLEFT); }
+        $img->setImageFormat('jpeg');
+        if (method_exists($img, 'setImageCompressionQuality')) { $img->setImageCompressionQuality(85); }
+        $dest = ASSETS_DIR.$base.'.jpg';
+        if (!$img->writeImage($dest)) $out('fail',['error'=>'heic_convert_failed']);
+      } catch (Throwable $e) {
+        $out('fail', ['error'=>'heic_unavailable']);
+      }
+    } else {
+      $out('fail', ['error'=>'heic_not_supported']);
+    }
+    echo json_encode(['status'=>'ok','url'=>ASSETS_URL.basename($dest)]);
+    exit;
+  }
+
+  if (!in_array($mime, $allowed_native, true)) {
+    $out('fail', ['error'=>"type_{$mime}_not_allowed"]);
+  }
+  $ext = match ($mime) {
+    'image/jpeg' => '.jpg',
+    'image/png'  => '.png',
+    'image/webp' => '.webp',
+    default      => ''
+  };
+  if ($ext === '') $out('fail', ['error'=>'ext_resolve_failed']);
+
+  $dest = ASSETS_DIR.$base.$ext;
+  if (!@move_uploaded_file($tmp, $dest)) $out('fail', ['error'=>'move_failed']);
+
+  echo json_encode(['status'=>'ok','url'=>ASSETS_URL.basename($dest)]);
   exit;
 }
 
@@ -313,26 +368,23 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-gray-border:#394556;
   }
 
-  /* Mantén tipografía/colores y quita el fondo del body/html */
   html,body{
     height:100%;
     margin:0;
     font-family:system-ui,Segoe UI,Roboto,Arial;
     color:var(--text);
-    background:transparent; /* sin fondo aquí */
+    background:transparent;
   }
-
-  /* Capa de degradado FIJA que ocupa 100% del viewport y no se mueve */
   body::before{
     content:"";
-    position:fixed;   /* no se desplaza con el scroll */
-    inset:0;          /* cubre todo el viewport */
-    z-index:-1;       /* detrás del contenido */
+    position:fixed;
+    inset:0;
+    z-index:-1;
     background:
       radial-gradient(1000px 500px at 80% -10%, #1a2330 0%, transparent 60%),
       radial-gradient(900px 400px at -10% 90%, #11202a 0%, transparent 55%),
       var(--bg);
-    background-repeat:no-repeat; /* no repetir */
+    background-repeat:no-repeat;
   }
 
   header, footer{padding:16px; text-align:center}
@@ -341,7 +393,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
   .bar{max-width:1100px;margin:16px auto;display:flex;gap:8px;align-items:center;justify-content:center}
 
-  /* Botón base unificado */
   .btn,
   .btn:link,
   .btn:visited{
@@ -359,7 +410,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
   .bar .btn{ width:120px; }
 
-  /* ====== LAYOUT ====== */
   .wrap{
     max-width:1100px; margin:0 auto 28px; padding:0 12px;
     display:grid; grid-template-columns: 2fr 1fr; gap:16px; align-items:start;
@@ -391,7 +441,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .note{color:#9fb0be;font-size:13px}
   .thumb{ width:80px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000; cursor: zoom-in; }
 
-  /* Inputs */
   .form{display:grid;gap:12px}
   .field{
     width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid #2a3340;
@@ -405,7 +454,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .lbl > span{ display:block; margin-bottom:6px; color:#e8eef4; font-weight:600 }
   .codes-editor{display:grid;gap:10px}
 
-  /* Code row (Add/Edit) */
   .code-edit-new{
     display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
     gap:10px; align-items:start; background:#0f141a; border:1px solid var(--line);
@@ -414,7 +462,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .code-edit-new .row-wide { grid-column: 1 / -1; }
   .code-edit-new .col-img{display:flex;align-items:center;gap:10px;justify-content:flex-end}
 
-  /* Photo preview */
   .preview-box{ margin-top:10px; display:none; }
   .preview-box.show{ display:block; }
   .preview-box .mini-thumb{
@@ -422,7 +469,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     border:1px solid var(--line); border-radius:12px; background:#000;
   }
 
-  /* Modal */
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:9999; padding:20px; }
   .modal.open{ display:flex; }
   .modal img{ max-width:min(90vw,1000px); max-height:80vh; object-fit:contain; border-radius:12px; border:1px solid #2a3340; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
@@ -432,7 +478,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .hr{height:1px;background:var(--line);margin:10px 0}
   .flash{margin:10px auto;max-width:1100px;background:#0f141a;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center}
 
-  /* Stack vertical de botones en Edit community */
   .actions-stack{
     width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;
   }
@@ -501,8 +546,8 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
                 <textarea class="field row-wide" name="codes[<?= $idx ?>][details]" placeholder="Details"><?=htmlspecialchars($row['details']??'')?></textarea>
 
                 <div class="row-wide">
-                  <label class="lbl"><span>Location photo (JPG/PNG) — optional</span>
-                    <input class="field file-row" type="file" accept=".jpg,.jpeg,.png">
+                  <label class="lbl"><span>Location photo (JPG/PNG/WebP/HEIC)</span>
+                    <input class="field file-row" type="file" accept="image/*">
                   </label>
                   <div class="preview-box show">
                     <img class="mini-thumb" src="<?= htmlspecialchars($photo) ?>" alt="preview">
@@ -542,9 +587,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
                 $p = web_photo($code['photo'] ?? '');
                 ?>
                 <div class="code-row">
-                    <img class="thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
-
-
+                  <img class="thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
                   <div class="c-left">
                     <div class="code"><?= htmlspecialchars($code['code'] ?? '') ?></div>
                     <?php if(!empty($code['notes'])): ?><div class="note"><?= htmlspecialchars($code['notes']) ?></div><?php endif; ?>
@@ -595,35 +638,33 @@ function el(html){ const t=document.createElement('template'); t.innerHTML=html.
 /* Plantilla de fila NUEVA */
 function rowTemplate(prefix, idx){
   return `
-  <div class="code-edit-new" data-row="${idx}">
-    <input class="field" name="${prefix}[${idx}][code]" placeholder="e.g., #54839*"
+  <div class="code-edit-new" data-row="\${idx}">
+    <input class="field" name="\${prefix}[\${idx}][code]" placeholder="e.g., #54839*"
            required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
            title="Up to 8 characters: letters, numbers, # or *">
 
-    <input class="field" name="${prefix}[${idx}][notes]"
+    <input class="field" name="\${prefix}[\${idx}][notes]"
            placeholder="Entrance type">
 
-    <textarea class="field row-wide" name="${prefix}[${idx}][details]" placeholder="Details"></textarea>
+    <textarea class="field row-wide" name="\${prefix}[\${idx}][details]" placeholder="Details"></textarea>
 
     <div class="row-wide">
-      <label class="lbl"><span>Location photo (JPG/PNG) — optional</span>
-        <input class="field file-row" type="file" accept=".jpg,.jpeg,.png">
+      <label class="lbl"><span>Location photo (JPG/PNG/WebP/HEIC)</span>
+        <input class="field file-row" type="file" accept="image/*">
       </label>
       <div class="preview-box">
         <img class="mini-thumb" src="" alt="preview">
-        <input type="hidden" name="${prefix}[${idx}][photo]" value="">
+        <input type="hidden" name="\${prefix}[\${idx}][photo]" value="">
       </div>
       <div class="mini up-note"></div>
     </div>
 
-    <!-- Remove al final, debajo de Choose file, full width -->
     <div class="row-wide">
       <button class="btn danger" type="button" style="width:100%;"
               onclick="this.closest('.code-edit-new').remove()">Remove</button>
     </div>
   </div>`;
 }
-
 
 /* Guardar archivo seleccionado por fila para subirlo justo antes del submit */
 const rowFiles = new WeakMap();
@@ -674,23 +715,33 @@ async function uploadQueuedRows(container){
     const fd = new FormData();
     fd.append('key','<?=htmlspecialchars(ADMIN_KEY)?>');
     fd.append('photo', f);
+
     const p = fetch('?ajax=upload&key=<?=htmlspecialchars(ADMIN_KEY)?>', { method:'POST', body: fd })
-      .then(r=>r.json())
-      .then(data=>{
-        if(data.status==='ok' && data.url){
+      .then(async r=>{
+        const text = await r.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = {status:'fail', error: 'bad_json', raw:text}; }
+
+        if (!r.ok) {
+          if (note) note.textContent = `HTTP ${r.status}${data.error ? ` · ${data.error}` : ''}`;
+          return;
+        }
+
+        if (data.status==='ok' && data.url) {
           attachPhotoToRow(row, data.url);
           rowFiles.delete(row);
           if (note) note.textContent = 'Photo uploaded.';
         } else {
-          if (note) note.textContent = 'Upload failed.';
+          const msg = data.error || 'Upload failed';
+          if (note) note.textContent = msg;
         }
       })
       .catch(()=> { if (note) note.textContent='Network error.'; });
+
     uploads.push(p);
   });
   if (uploads.length) await Promise.all(uploads);
 
-  /* Asegurar valor por defecto si no hay URL */
   rows.forEach((row)=>{
     const hidden = row.querySelector('.preview-box input[type="hidden"]');
     if (hidden && !hidden.value) hidden.value = DEFAULT_THUMB_URL;
@@ -730,7 +781,6 @@ if (addBtn){
       if (v.length === 0 || v.length > 8) { inp.focus(); return; }
     }
     await uploadQueuedRows(document.getElementById('codesNew'));
-    // submit nativo
     HTMLFormElement.prototype.submit.call(document.getElementById('addForm'));
   });
 }
@@ -757,19 +807,17 @@ if (editForm){
 
   let editSubmitting = false;
   editForm.addEventListener('submit', async (e)=>{
-    if (editSubmitting) return;           // permitir el submit nativo ya iniciado
+    if (editSubmitting) return;
     e.preventDefault();
-    // Si es update, primero subir imágenes nuevas
     if (editAction.value !== 'delete_comm'){
       await uploadQueuedRows(document.getElementById('codesEditor'));
     }
     editSubmitting = true;
-    // Submit nativo sin relanzar el listener
     HTMLFormElement.prototype.submit.call(editForm);
   });
 }
 
-/* Botón "Delete code": crea y envía un form propio (sin forms anidados) */
+/* Botón "Delete code": crea y envía un form propio */
 document.addEventListener('click', (e)=>{
   const t = e.target;
   if (t && t.classList && t.classList.contains('js-del-code')){
