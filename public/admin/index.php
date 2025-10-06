@@ -4,7 +4,8 @@
 const ADMIN_KEY   = '43982';
 const GATES_JSON  = __DIR__ . '/../data/gates.json';
 const ASSETS_DIR  = __DIR__ . '/../assets/';
-const DEFAULT_THUMB_FILE = 'thumbnailnone.png';
+//const DEFAULT_THUMB_FILE = 'thumbnailnone.png'; // thumbnail default image
+const DEFAULT_THUMB_FILE = 'gate_20251003_125031_de134d.png'; // thumbnail default image
 
 // URL base absoluta para /gatecodes/assets/ (normaliza ../)
 $APP_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/'); // ej: "/gatecodes"
