@@ -527,8 +527,8 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
               <div class="code-edit-new">
                 <input class="field" name="codes[<?= $idx ?>][code]" placeholder="e.g., #54839*"
                        value="<?=htmlspecialchars($row['code']??'')?>"
-                       required maxlength="14" pattern="[A-Za-z0-9#*]{1,14}"
-                       title="Up to 14 characters: letters, numbers, # or *">
+                       required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
+                       title="Up to 8 characters: letters, numbers, # or *">
 
                 <input class="field" name="codes[<?= $idx ?>][notes]"
                        placeholder="Entrance type"
@@ -638,16 +638,15 @@ function el(html){ const t=document.createElement('template'); t.innerHTML=html.
 /* Plantilla de fila NUEVA */
 function rowTemplate(prefix, idx){
   return `
-  <div class="code-edit-new" data-row="\${idx}">
-    <input class="field" name="\${prefix}[\${idx}][code]"
-           placeholder="e.g., #54839*"
-           required maxlength="14" pattern="[A-Za-z0-9#*]{1,14}"
-           title="Up to 14 characters: letters, numbers, # or *">
+  <div class="code-edit-new" data-row="${idx}">
+    <input class="field" name="${prefix}[${idx}][code]" placeholder="e.g., #54839*"
+           required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
+           title="Up to 8 characters: letters, numbers, # or *">
 
-    <input class="field" name="\${prefix}[\${idx}][notes]"
+    <input class="field" name="${prefix}[${idx}][notes]"
            placeholder="Entrance type">
 
-    <textarea class="field row-wide" name="\${prefix}[\${idx}][details]" placeholder="Details"></textarea>
+    <textarea class="field row-wide" name="${prefix}[${idx}][details]" placeholder="Details"></textarea>
 
     <div class="row-wide">
       <label class="lbl"><span>Location photo (JPG/PNG/WebP/HEIC)</span>
@@ -655,7 +654,7 @@ function rowTemplate(prefix, idx){
       </label>
       <div class="preview-box">
         <img class="mini-thumb" src="" alt="preview">
-        <input type="hidden" name="\${prefix}[\${idx}][photo]" value="">
+        <input type="hidden" name="${prefix}[${idx}][photo]" value="">
       </div>
       <div class="mini up-note"></div>
     </div>
@@ -749,7 +748,7 @@ async function uploadQueuedRows(container){
   });
 }
 
-/* Crear filas en “Add” */
+/* Crear filas en "Add" */
 let idxNew  = 0;
 const codesNewBox = document.getElementById('codesNew');
 function addRowNew(){
@@ -773,16 +772,40 @@ function addRowEdit(){
 /* Wire inicial para filas existentes */
 document.querySelectorAll('#codesEditor .code-edit-new').forEach(wireRow);
 
-/* Submit “Add New Entry” */
+/* Submit "Add New Entry" - FIXED */
 const addBtn = document.getElementById('btnAddCommunity');
 if (addBtn){
   addBtn.addEventListener('click', async ()=>{
-    for (const inp of document.querySelectorAll('#codesNew input[name*="[code]"]')) {
-      const v = inp.value.trim();
-      if (v.length === 0 || v.length > 14) { inp.focus(); return; }
+    const codeInputs = document.querySelectorAll('#codesNew input[name*="[code]"]');
+    
+    // Verificar que haya al menos una fila
+    if (codeInputs.length === 0) {
+      alert('Add at least one code.');
+      return;
     }
+    
+    // Validar que al menos UN código esté completo
+    let hasValidCode = false;
+    for (const inp of codeInputs) {
+      const v = inp.value.trim();
+      if (v.length > 0) {
+        if (v.length > 8) {
+          alert('Code must be 8 characters or less.');
+          inp.focus();
+          return;
+        }
+        hasValidCode = true;
+      }
+    }
+    
+    if (!hasValidCode) {
+      alert('Add at least one code.');
+      codeInputs[0]?.focus();
+      return;
+    }
+    
     await uploadQueuedRows(document.getElementById('codesNew'));
-    document.getElementById('addForm').requestSubmit();
+    HTMLFormElement.prototype.submit.call(document.getElementById('addForm'));
   });
 }
 
