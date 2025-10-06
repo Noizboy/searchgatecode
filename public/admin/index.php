@@ -701,7 +701,7 @@ function attachPhotoToRow(row, url){
   if (pbox) pbox.classList.add('show');
 }
 
-/* Subir en lote lo pendiente dentro de un contenedor (Add o Edit) */
+  /* Subir en lote lo pendiente dentro de un contenedor (Add o Edit) */
 async function uploadQueuedRows(container){
   if (!container) return;
   const rows = container.querySelectorAll('.code-edit-new');
@@ -742,9 +742,18 @@ async function uploadQueuedRows(container){
   });
   if (uploads.length) await Promise.all(uploads);
 
+  // Asegurar que todas las filas tengan una foto (por defecto o subida)
   rows.forEach((row)=>{
     const hidden = row.querySelector('.preview-box input[type="hidden"]');
-    if (hidden && !hidden.value) hidden.value = DEFAULT_THUMB_URL;
+    const img = row.querySelector('.preview-box .mini-thumb');
+    const pbox = row.querySelector('.preview-box');
+    
+    // Si no tiene foto asignada, usar la imagen por defecto
+    if (hidden && !hidden.value) {
+      hidden.value = DEFAULT_THUMB_URL;
+      if (img) img.src = DEFAULT_THUMB_URL;
+      if (pbox) pbox.classList.add('show');
+    }
   });
 }
 
