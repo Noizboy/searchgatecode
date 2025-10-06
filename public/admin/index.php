@@ -527,7 +527,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
               <div class="code-edit-new">
                 <input class="field" name="codes[<?= $idx ?>][code]" placeholder="e.g., #54839*"
                        value="<?=htmlspecialchars($row['code']??'')?>"
-                       required maxlength="14" pattern="[A-Za-z0-9#*]{1,8}"
+                       required maxlength="14" pattern="[A-Za-z0-9#*]{1,14}"
                        title="Up to 14 characters: letters, numbers, # or *">
 
                 <input class="field" name="codes[<?= $idx ?>][notes]"
@@ -639,9 +639,10 @@ function el(html){ const t=document.createElement('template'); t.innerHTML=html.
 function rowTemplate(prefix, idx){
   return `
   <div class="code-edit-new" data-row="\${idx}">
-    <input class="field" name="\${prefix}[\${idx}][code]" placeholder="e.g., #54839*"
-           required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
-           title="Up to 8 characters: letters, numbers, # or *">
+    <input class="field" name="\${prefix}[\${idx}][code]"
+           placeholder="e.g., #54839*"
+           required maxlength="14" pattern="[A-Za-z0-9#*]{1,14}"
+           title="Up to 14 characters: letters, numbers, # or *">
 
     <input class="field" name="\${prefix}[\${idx}][notes]"
            placeholder="Entrance type">
@@ -778,10 +779,10 @@ if (addBtn){
   addBtn.addEventListener('click', async ()=>{
     for (const inp of document.querySelectorAll('#codesNew input[name*="[code]"]')) {
       const v = inp.value.trim();
-      if (v.length === 0 || v.length > 8) { inp.focus(); return; }
+      if (v.length === 0 || v.length > 14) { inp.focus(); return; }
     }
     await uploadQueuedRows(document.getElementById('codesNew'));
-    HTMLFormElement.prototype.submit.call(document.getElementById('addForm'));
+    document.getElementById('addForm').requestSubmit();
   });
 }
 
