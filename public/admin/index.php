@@ -4,13 +4,13 @@
 const ADMIN_KEY   = '43982';
 const GATES_JSON  = __DIR__ . '/../data/gates.json';
 const ASSETS_DIR  = __DIR__ . '/../assets/';
-//const DEFAULT_THUMB_FILE = 'thumbnailnone.png'; // thumbnail default image
-const DEFAULT_THUMB_FILE = 'gate_20251003_125031_de134d.png'; // thumbnail default image
+const DEFAULT_THUMB_FILE = 'thumbnailnone.png';
 
 // URL base absoluta para /gatecodes/assets/ (normaliza ../)
 $APP_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/'); // ej: "/gatecodes"
-define('ASSETS_URL', $APP_URL . '/assets/');                     // ej: "/gatecodes/assets/"
-define('DEFAULT_THUMB_URL', ASSETS_URL . DEFAULT_THUMB_FILE);    // ej: "/gatecodes/assets/thumbnailnone.png"
+define('ASSETS_URL', $APP_URL . '/assets/');                     // ej: "/gatecodes/assets/" (solo para visualización)
+define('ASSETS_RELATIVE', 'assets/');                             // ruta relativa para guardar en JSON
+define('DEFAULT_THUMB_URL', ASSETS_RELATIVE . DEFAULT_THUMB_FILE); // ej: "assets/thumbnailnone.png"
 
 
 /* Minimal auth */
@@ -114,6 +114,20 @@ function delete_photo_by_url($url){
   return @unlink($p);
 }
 
+/******************** DOWNLOAD JSON ********************/
+if (isset($_GET['download_json'])) {
+  if (!file_exists(GATES_JSON)) {
+    http_response_code(404);
+    exit('gates.json not found');
+  }
+  
+  header('Content-Type: application/json');
+  header('Content-Disposition: attachment; filename="gates_backup_' . date('Y-m-d_His') . '.json"');
+  header('Content-Length: ' . filesize(GATES_JSON));
+  readfile(GATES_JSON);
+  exit;
+}
+
 /******************** AJAX: UPLOAD (single-row) ********************/
 if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
   header('Content-Type: application/json');
@@ -176,7 +190,7 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
     } else {
       $out('fail', ['error'=>'heic_not_supported']);
     }
-    echo json_encode(['status'=>'ok','url'=>ASSETS_URL.basename($dest)]);
+    echo json_encode(['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)]);
     exit;
   }
 
@@ -194,13 +208,54 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
   $dest = ASSETS_DIR.$base.$ext;
   if (!@move_uploaded_file($tmp, $dest)) $out('fail', ['error'=>'move_failed']);
 
-  echo json_encode(['status'=>'ok','url'=>ASSETS_URL.basename($dest)]);
+  echo json_encode(['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)]);
   exit;
 }
 
 /******************** ACTIONS (POST) ********************/
 $action = $_POST['action'] ?? '';
 $msg = '';
+
+if ($action === 'upload_json') {
+  if (!isset($_FILES['json_file'])) {
+    $msg = 'No file selected.';
+  } else {
+    $file = $_FILES['json_file'];
+    
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+      $msg = 'Upload error: ' . $file['error'];
+    } else if ($file['size'] > 5 * 1024 * 1024) { // 5MB max
+      $msg = 'File too large (max 5MB).';
+    } else {
+      // Validate JSON
+      $content = file_get_contents($file['tmp_name']);
+      $json = json_decode($content, true);
+      
+      if (json_last_error() !== JSON_ERROR_NONE) {
+        $msg = 'Invalid JSON file: ' . json_last_error_msg();
+      } else if (!is_array($json)) {
+        $msg = 'JSON must be an array.';
+      } else {
+        // Create backup before overwriting
+        $backup_dir = dirname(GATES_JSON) . '/backups';
+        if (!is_dir($backup_dir)) @mkdir($backup_dir, 0775, true);
+        
+        $backup_file = $backup_dir . '/gates_backup_' . date('Y-m-d_His') . '.json';
+        if (file_exists(GATES_JSON)) {
+          @copy(GATES_JSON, $backup_file);
+        }
+        
+        // Write new file
+        if (write_json(GATES_JSON, $json)) {
+          header('Location: ?key=' . urlencode(ADMIN_KEY) . '&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
+          exit;
+        } else {
+          $msg = 'Failed to write JSON file.';
+        }
+      }
+    }
+  }
+}
 
 if ($action === 'add') {
   $data = read_json(GATES_JSON);
@@ -244,13 +299,33 @@ if ($action === 'update') {
   else {
     $new_name = trim($_POST['community'] ?? $original);
     $rows = $_POST['codes'] ?? [];
+
+    // Find an existing photo from this community's codes
+    $existing_photo = null;
+    if (isset($data[$idx]['codes'])) {
+      foreach ($data[$idx]['codes'] as $existing_code) {
+        $photo = trim($existing_code['photo'] ?? '');
+        // Skip default thumbnails (both relative and absolute paths)
+        if ($photo !== '' &&
+            $photo !== DEFAULT_THUMB_URL &&
+            $photo !== 'assets/thumbnailnone.png' &&
+            stripos($photo, 'thumbnailnone.png') === false) {
+          $existing_photo = $photo;
+          break;
+        }
+      }
+    }
+
     $codes=[];
     foreach($rows as $r){
       $code=trim($r['code']??''); if($code==='') continue;
       $entry=['code'=>$code];
       foreach(['notes','details','photo'] as $k){
         $v=trim($r[$k]??'');
-        if($k==='photo' && $v===''){ $v = DEFAULT_THUMB_URL; }
+        if($k==='photo' && $v===''){
+          // Use existing photo from community if available, otherwise use default
+          $v = $existing_photo ?? DEFAULT_THUMB_URL;
+        }
         if($v!=='') $entry[$k]=$v;
       }
       $codes[]=$entry;
@@ -389,10 +464,81 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   }
 
   header, footer{padding:16px; text-align:center}
-  h1{margin:0 0 6px 0}
-  .sub{color:var(--muted)}
+  
+  footer {
+    margin-top: 40px;
+    padding: 20px 16px;
+    background: linear-gradient(180deg, rgba(21, 26, 32, 0.6), rgba(15, 19, 24, 0.8));
+    border-top: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+  }
+  
+  footer .footer-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  
+  footer .footer-heart {
+    color: #ff5c5c;
+    animation: heartbeat 1.5s ease-in-out infinite;
+    display: inline-block;
+  }
+  
+  footer .footer-by {
+    font-weight: 600;
+    background: linear-gradient(90deg, #3bdd82, #1bbf67);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.1); }
+    50% { transform: scale(1); }
+  }
+  
+  .sub{color:var(--muted);margin-top:6px}
 
-  .bar{max-width:1100px;margin:16px auto;display:flex;gap:8px;align-items:center;justify-content:center}
+  /* Title style del front page */
+  .title {
+    font-size: 3rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; margin: 0;
+    background: linear-gradient(90deg, #3bdd82, #1bbf67);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative; display: inline-block; text-shadow: 0 2px 6px rgba(0,0,0,.3);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .title:hover {
+    opacity: 0.9;
+  }
+  .title::after {
+    content:""; position: absolute; left: 0; bottom: -6px; width: 100%; height: 3px;
+    background: linear-gradient(90deg, #3bdd82, #1bbf67);
+    border-radius: 2px; transform: scaleX(0); transform-origin: left;
+    transition: transform 0.6s ease-in-out;
+  }
+  .title:hover::after {
+    transform: scaleX(1);
+  }
+
+  .json-actions {
+    max-width:1100px;
+    margin:20px auto 20px;
+    padding:0 12px;
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
 
   .btn,
   .btn:link,
@@ -403,29 +549,104 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2));
     color:#E6EDF3; font-size:16px; font-weight:700; letter-spacing:.2px;
     text-decoration:none; cursor:pointer; text-align:center; line-height:1; box-sizing:border-box;
+    transition:background .15s ease;
   }
   .btn:hover,.btn:focus-visible{ background:linear-gradient(180deg,#313C4B,#222A36); outline:none; }
   .btn.primary{ border:0; background:linear-gradient(135deg,var(--btn-green-1),var(--btn-green-2)); color:#fff; }
   .btn.danger{ border:0; background:linear-gradient(135deg,var(--btn-red-1),var(--btn-red-2)); color:#fff; }
   .btn.neutral{ background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2)); color:#E6EDF3; border:1px solid var(--btn-gray-border); }
 
-  .bar .btn{ width:120px; }
+  .upload-json-form {
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  
+  .upload-json-form input[type="file"] {
+    display:none;
+  }
 
   .wrap{
     max-width:1100px; margin:0 auto 28px; padding:0 12px;
-    display:grid; grid-template-columns: 2fr 1fr; gap:16px; align-items:start;
-  }
-  .pane-list{ order:-1; }
-  .pane-add  { order:0; }
-  @media (max-width:1000px){
-    .wrap{ grid-template-columns:1fr; }
-    .pane-add  { order:-1; }
-    .pane-list { order:0; }
+    display:grid; grid-template-columns: 7fr 3fr; gap:16px; align-items:start;
   }
 
-  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:var(--radius);padding:14px;overflow:hidden}
-  .card h2{margin:0 0 10px 0}
+  .wrap.edit-mode {
+    grid-template-columns: 1fr;
+  }
+
+  @media (max-width:900px){
+    .wrap{ grid-template-columns:1fr; gap: 24px; }
+    .title { font-size: 2.2rem; }
+    .card:first-child { order: 2; }
+    .card:last-child { order: 1; }
+  }
+
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px;
+    display: flex;
+    flex-direction: column;
+    /*height: 100%;*/
+    height: 100%;
+    max-height: 700px;
+  }
+
+  .wrap.edit-mode .card {
+    max-height: 800px;
+  }
+
+  .wrap.edit-mode .card.add-community-card {
+    display: none;
+  }
+  
+  .card-header {
+    flex-shrink: 0;
+  }
+  
+  .card h2{margin:0 0 12px 0}
   .muted{color:var(--muted)}
+
+  /* Search form inside Communities */
+  .search-inline {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .search-inline .field {
+    flex: 1;
+  }
+  .search-inline .btn {
+    min-width: 100px;
+  }
+  
+  /* Scroll container for communities list */
+  .communities-scroll{
+    flex: 1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding-right:8px;
+    min-height: 0;
+  }
+  
+  /* Custom Scrollbar for communities */
+  .communities-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .communities-scroll::-webkit-scrollbar-track {
+    background: #0f141a;
+    border-radius: 10px;
+  }
+  .communities-scroll::-webkit-scrollbar-thumb {
+    background: #2a3340;
+    border-radius: 10px;
+  }
+  .communities-scroll::-webkit-scrollbar-thumb:hover {
+    background: #364456;
+  }
+  
   .grid{display:grid;gap:12px}
   .comm{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px}
   .comm-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
@@ -433,16 +654,80 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     font-weight:800;
     font-size: 20px;
     line-height: 1.2;
-    }
+  }
   .comm-actions{display:flex;gap:8px;flex-wrap:wrap}
   .codes{display:grid;gap:8px;margin-top:10px}
   .code-row{display:flex;gap:12px;align-items:flex-start;background:#0f141a;border:1px solid var(--line);border-radius:12px;padding:10px}
   .c-left{flex:1;display:flex;flex-direction:column;align-items:flex-start;text-align:left}
-  .code{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .code{font-family:ui-monospace,Menlo,Consolas,monospace; display:flex; align-items:center; gap:8px; font-size:17px;}
   .note{color:#9fb0be;font-size:13px}
+
+  .report-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:20px;
+    height:20px;
+    min-width:20px;
+    min-height:20px;
+    max-width:20px;
+    max-height:20px;
+    background:#ff3b3b;
+    color:#fff;
+    font-size:11px;
+    font-weight:600;
+    border-radius:50%;
+    font-family:system-ui,Segoe UI,Roboto,Arial;
+    flex-shrink:0;
+    line-height:20px;
+    box-sizing:border-box;
+    text-align:center;
+  }
   .thumb{ width:80px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000; cursor: zoom-in; }
 
-  .form{display:grid;gap:12px}
+  .form{display:grid;gap:16px; overflow:visible; min-height: 0;}
+  
+  /* Contenedor con scroll para codes-editor */
+  .codes-scroll-container {
+    max-height: 350px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    margin-bottom: 12px;
+  }
+  
+  /* Custom Scrollbar for codes editor */
+  .codes-scroll-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  .codes-scroll-container::-webkit-scrollbar-track {
+    background: #0f141a;
+    border-radius: 10px;
+  }
+  .codes-scroll-container::-webkit-scrollbar-thumb {
+    background: #2a3340;
+    border-radius: 10px;
+  }
+  .codes-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #364456;
+  }
+  
+  /* Custom Scrollbar for Add Community form - mantener solo para otros elementos */
+  .form::-webkit-scrollbar {
+    width: 8px;
+  }
+  .form::-webkit-scrollbar-track {
+    background: #0f141a;
+    border-radius: 10px;
+  }
+  .form::-webkit-scrollbar-thumb {
+    background: #2a3340;
+    border-radius: 10px;
+  }
+  .form::-webkit-scrollbar-thumb:hover {
+    background: #364456;
+  }
+  
   .field{
     width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid #2a3340;
     background:linear-gradient(180deg,#0f141a,#0c1116); color:#e8eef4;
@@ -453,6 +738,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   textarea.field{ resize:vertical; min-height:90px }
 
   .lbl > span{ display:block; margin-bottom:6px; color:#e8eef4; font-weight:600 }
+  .lbl { margin-bottom: 0; }
   .codes-editor{display:grid;gap:10px}
 
   .code-edit-new{
@@ -475,7 +761,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .modal img{ max-width:min(90vw,1000px); max-height:80vh; object-fit:contain; border-radius:12px; border:1px solid #2a3340; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
   .modal .close{ position:absolute; top:14px; right:18px; font-size:28px; line-height:1; color:#e8eef4; cursor:pointer; user-select:none; background:transparent; border:none; padding:6px 10px; }
 
-  .mini{font-size:12px;color:#93a0ad}
+  .mini{font-size:13px;color:#e8eef4;font-weight:600;margin-bottom:6px;display:block}
   .hr{height:1px;background:var(--line);margin:10px 0}
   .flash{margin:10px auto;max-width:1100px;background:#0f141a;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center}
 
@@ -483,27 +769,84 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;
   }
   .actions-stack .btn{ width:100%; }
+
+  /* Action buttons - Frontend style */
+  .btn-primary, .btn-danger {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: 0;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(59,221,130,.4);
+    transition: transform .1s ease, box-shadow .2s ease;
+    color: #07140c;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #2FD874, #12B767);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 6px 18px rgba(59,221,130,.55);
+  }
+  .btn-danger {
+    background: linear-gradient(135deg, #FF5A5F, #E23D3D);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255,92,92,.4);
+  }
+  .btn-danger:hover {
+    box-shadow: 0 6px 18px rgba(255,92,92,.55);
+  }
+  .btn-primary:active, .btn-danger:active {
+    transform: translateY(1px);
+  }
+  /* Oculto por defecto */
+  .br-mobile { display: none; }
+
+  /* Solo en responsive (ajusta el breakpoint) */
+  @media (max-width: 768px) {
+    .br-mobile { display: inline; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Admin Dashboard</h1>
-  <div class="sub">Edit <code>gates.json</code> · Search · Add/Modify/Delete</div>
+  <a href="?key=<?=urlencode(ADMIN_KEY)?>" class="title">Gate Codes</a>
+  <div class="sub">Admin Dashboard · Edit <code>gates.json</code></div>
   <?php if($msg): ?><div class="flash"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
 </header>
 
-<!-- Search bar -->
-<form class="bar" method="get">
-  <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-  <input class="field" type="text" name="q" value="<?=htmlspecialchars($q)?>" placeholder="Search by community or code">
-  <button class="btn" type="submit">Search</button>
-  <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>">Reset</a>
-</form>
+<!-- JSON Upload/Download Actions -->
+<div class="json-actions">
+  <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>&download_json=1" download>
+    📥 Download JSON
+  </a>
+  
+  <form class="upload-json-form" method="post" enctype="multipart/form-data" id="uploadJsonForm">
+    <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
+    <input type="hidden" name="action" value="upload_json">
+    <input type="file" name="json_file" id="jsonFileInput" accept=".json,application/json" required>
+    <label for="jsonFileInput" class="btn" style="cursor:pointer;margin:0;">
+      📤 Upload JSON
+    </label>
+  </form>
+</div>
 
-<div class="wrap">
+<div class="wrap<?= $edit ? ' edit-mode' : '' ?>">
   <!-- LIST / EDIT  (Communities) -->
-  <section class="card pane-list">
-    <h2><?= $edit ? 'Edit community' : 'Communities' ?></h2>
+  <section class="card">
+    <div class="card-header">
+      <h2><?= $edit ? 'Edit community' : 'Communities' ?></h2>
+      
+      <?php if(!$edit): ?>
+        <!-- Search form inline -->
+        <form class="search-inline" method="get">
+          <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
+          <input class="field" type="text" name="q" value="<?=htmlspecialchars($q)?>" placeholder="Search by community or code">
+          <button class="btn" type="submit">Search</button>
+        </form>
+      <?php endif; ?>
+    </div>
 
     <?php if($edit):
       $i = find_comm_index($data,$edit);
@@ -520,8 +863,9 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
             <input class="field" name="community" value="<?=htmlspecialchars($c['community'])?>" required>
           </label>
 
-          <div class="mini">Codes (add/remove as needed)</div>
-          <div id="codesEditor" class="codes-editor">
+          <label class="lbl"><span>Codes (add/remove as needed)</span>
+            <div class="codes-scroll-container">
+              <div id="codesEditor" class="codes-editor">
             <?php foreach(($c['codes']??[]) as $idx=>$row):
               $photo = web_photo($row['photo'] ?? '');
             ?>
@@ -558,54 +902,64 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
                 </div>
               </div>
             <?php endforeach; ?>
-          </div>
+              </div>
+            </div>
 
-          <div><button class="btn" type="button" onclick="addRowEdit()">+ Add code</button></div>
+            <div><button class="btn" type="button" onclick="addRowEdit()">+ Add code</button></div>
+          </label>
           <div class="hr"></div>
 
           <div class="actions-stack">
-            <button class="btn primary" type="submit" id="btnSave">Save changes</button>
-            <button class="btn danger" type="submit" id="btnDelete">Delete Community</button>
-            <a class="btn neutral" href="?key=<?=urlencode(ADMIN_KEY)?>">Cancel</a>
+            <button class="btn-primary" type="submit" id="btnSave">Save Changes</button>
+            <button class="btn-danger" type="submit" id="btnDelete">Delete Community</button>
           </div>
         </form>
       <?php endif; ?>
 
     <?php else: ?>
-      <div class="grid">
-        <?php if(empty($filtered)): ?>
-          <p class="muted">No communities found.</p>
-        <?php else: foreach($filtered as $row): ?>
-          <div class="comm">
-            <div class="comm-head">
-              <div class="comm-name"><?= htmlspecialchars($row['community']) ?></div>
-              <div class="comm-actions">
-                <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>&edit=<?=urlencode($row['community'])?>">Modify</a>
+      <div class="communities-scroll">
+        <div class="grid">
+          <?php if(empty($filtered)): ?>
+            <p class="muted">No communities found.</p>
+          <?php else: foreach($filtered as $row): ?>
+            <div class="comm">
+              <div class="comm-head">
+                <div class="comm-name"><?= htmlspecialchars($row['community']) ?></div>
+                <div class="comm-actions">
+                  <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>&edit=<?=urlencode($row['community'])?>">Modify</a>
+                </div>
+              </div>
+              <div class="codes">
+                <?php foreach(($row['codes']??[]) as $code):
+                  $p = web_photo($code['photo'] ?? '');
+                  ?>
+                  <div class="code-row">
+                    <img class="thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
+                    <div class="c-left">
+                      <div class="code">
+                        <span><?= htmlspecialchars($code['code'] ?? '') ?></span>
+                        <?php if(isset($code['report_count']) && $code['report_count'] > 0): ?>
+                          <span class="report-badge" title="<?= $code['report_count'] ?> report<?= $code['report_count'] > 1 ? 's' : '' ?>"><?= $code['report_count'] ?></span>
+                        <?php endif; ?>
+                      </div>
+                      <?php if(!empty($code['notes'])): ?><div class="note"><?= htmlspecialchars($code['notes']) ?></div><?php endif; ?>
+                      <?php if(!empty($code['details'])): ?><div class="note"><?= htmlspecialchars($code['details']) ?></div><?php endif; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
               </div>
             </div>
-            <div class="codes">
-              <?php foreach(($row['codes']??[]) as $code):
-                $p = web_photo($code['photo'] ?? '');
-                ?>
-                <div class="code-row">
-                  <img class="thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
-                  <div class="c-left">
-                    <div class="code"><?= htmlspecialchars($code['code'] ?? '') ?></div>
-                    <?php if(!empty($code['notes'])): ?><div class="note"><?= htmlspecialchars($code['notes']) ?></div><?php endif; ?>
-                    <?php if(!empty($code['details'])): ?><div class="note"><?= htmlspecialchars($code['details']) ?></div><?php endif; ?>
-                  </div>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          </div>
-        <?php endforeach; endif; ?>
+          <?php endforeach; endif; ?>
+        </div>
       </div>
     <?php endif; ?>
   </section>
 
   <!-- ADD NEW -->
-  <section class="card pane-add">
-    <h2>Add community</h2>
+  <section class="card add-community-card">
+    <div class="card-header">
+      <h2>Add community</h2>
+    </div>
 
     <form class="form" method="post" id="addForm">
       <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
@@ -614,13 +968,17 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
         <input class="field" name="community" placeholder="e.g., Water Oaks" required>
       </label>
 
-      <div class="mini">Codes (add as many as you need)</div>
-      <div id="codesNew" class="codes-editor"></div>
-      <div><button class="btn" type="button" id="btnAddRow">+ Add code</button></div>
+      <label class="lbl"><span>Add Codes (add as many as you need)</span>
+        <div class="codes-scroll-container">
+          <div id="codesNew" class="codes-editor"></div>
+        </div>
+        <div><button class="btn" type="button" id="btnAddRow">+ Add code</button></div>
+      </label>
 
       <button class="btn primary" id="btnAddCommunity" type="button">Add New Entry</button>
     </form>
   </section>
+  <br class="br-mobile" />
 </div>
 
 <!-- ===== Image Modal ===== -->
@@ -629,9 +987,31 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   <img id="imgModalPic" src="" alt="photo">
 </div>
 
-<footer>© <?=date('Y')?> Made by Alejandro</footer>
+<footer>
+  <div class="footer-content">
+    <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a></span>
+  </div>
+</footer>
 <script>
 const DEFAULT_THUMB_URL = "<?=htmlspecialchars(DEFAULT_THUMB_URL)?>";
+
+/* Handle JSON file upload */
+document.getElementById('jsonFileInput')?.addEventListener('change', function(e) {
+  if (this.files.length > 0) {
+    const fileName = this.files[0].name;
+    if (!fileName.endsWith('.json')) {
+      alert('Please select a valid JSON file.');
+      this.value = '';
+      return;
+    }
+    
+    if (confirm(`Upload "${fileName}" and replace current gates.json?\n\nA backup will be created automatically.`)) {
+      document.getElementById('uploadJsonForm').submit();
+    } else {
+      this.value = '';
+    }
+  }
+});
 
 /* Utilidad para crear HTML */
 function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; }
@@ -661,10 +1041,23 @@ function rowTemplate(prefix, idx){
     </div>
 
     <div class="row-wide">
-      <button class="btn danger" type="button" style="width:100%;"
-              onclick="this.closest('.code-edit-new').remove()">Remove</button>
+      <button class="btn danger btn-remove-code" type="button" style="width:100%;">Remove</button>
     </div>
   </div>`;
+}
+
+/* Actualizar visibilidad de botones Remove */
+function updateRemoveButtons(container) {
+  if (!container) return;
+  const removeButtons = container.querySelectorAll('.btn-remove-code');
+  
+  // Si solo hay 1 fila con botón remove (nueva), ocultar el botón Remove
+  if (removeButtons.length === 1) {
+    removeButtons.forEach(btn => btn.style.display = 'none');
+  } else if (removeButtons.length > 1) {
+    // Si hay más de 1 fila nueva, mostrar todos los botones Remove
+    removeButtons.forEach(btn => btn.style.display = 'block');
+  }
 }
 
 /* Guardar archivo seleccionado por fila para subirlo justo antes del submit */
@@ -765,6 +1158,17 @@ function addRowNew(){
   const row = el(rowTemplate('codes', idxNew++));
   codesNewBox.appendChild(row);
   wireRow(row);
+  
+  // Agregar event listener al botón Remove
+  const removeBtn = row.querySelector('.btn-remove-code');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', function() {
+      this.closest('.code-edit-new').remove();
+      updateRemoveButtons(codesNewBox);
+    });
+  }
+  
+  updateRemoveButtons(codesNewBox);
 }
 if (codesNewBox){ addRowNew(); }
 const addRowBtn = document.getElementById('btnAddRow');
@@ -778,9 +1182,26 @@ function addRowEdit(){
   const row = el(rowTemplate('codes', next));
   box.appendChild(row);
   wireRow(row);
+  
+  // Agregar event listener al botón Remove
+  const removeBtn = row.querySelector('.btn-remove-code');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', function() {
+      this.closest('.code-edit-new').remove();
+      updateRemoveButtons(box);
+    });
+  }
+  
+  updateRemoveButtons(box);
 }
 /* Wire inicial para filas existentes */
 document.querySelectorAll('#codesEditor .code-edit-new').forEach(wireRow);
+
+/* Actualizar botones Remove en la carga inicial (Edit mode) */
+const codesEditorBox = document.getElementById('codesEditor');
+if (codesEditorBox) {
+  updateRemoveButtons(codesEditorBox);
+}
 
 /* Submit "Add New Entry" - FIXED */
 const addBtn = document.getElementById('btnAddCommunity');
