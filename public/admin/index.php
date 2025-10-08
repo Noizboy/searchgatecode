@@ -432,7 +432,16 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 <style>
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
-    --text:#e8eef4; --muted:#93a0ad; --line:#22303b; --radius:14px;
+    --text:#e8eef4; --muted:#93a0ad; --brand:#3bdd82; --brand-2:#1bbf67;
+    --danger:#ff5c5c; --danger-2:#e53935; --radius:14px;
+    --gradient-1:#1a2330; --gradient-2:#11202a;
+    --border:#2a3340; --border-2:#1e2a34; --line:#22303b;
+    --input-bg-1:#0f141a; --input-bg-2:#0c1116;
+    --scrollbar-track:#0f141a; --scrollbar-thumb:#2a3340; --scrollbar-thumb-hover:#364456;
+    --modal-bg-1:#1a1f26; --modal-bg-2:#12161c; --modal-border:#233041;
+    --btn-secondary-bg:#22272f; --btn-secondary-text:#d0d7de; --btn-secondary-border:#2e3947;
+    --btn-secondary-hover:#2a3240;
+    --footer-bg:rgba(15,19,24,0.5);
 
     /* Paleta botones */
     --btn-green-1:#2FD874;
@@ -444,12 +453,36 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-gray-border:#394556;
   }
 
+  [data-theme="light"]{
+    --bg:#f5f7fa; --panel:#ffffff; --panel-2:#f8f9fa;
+    --text:#1a1f26; --muted:#5a6c7d; --brand:#3bdd82; --brand-2:#1bbf67;
+    --danger:#ff5c5c; --danger-2:#e53935; --radius:14px;
+    --gradient-1:#e0f5ee; --gradient-2:#d4ede2;
+    --border:#d1dce5; --border-2:#e1e8ed; --line:#d1dce5;
+    --input-bg-1:#ffffff; --input-bg-2:#f9fafb;
+    --scrollbar-track:#e8eef4; --scrollbar-thumb:#c1ccd7; --scrollbar-thumb-hover:#a8b5c2;
+    --modal-bg-1:#ffffff; --modal-bg-2:#f8f9fa; --modal-border:#d1dce5;
+    --btn-secondary-bg:#f0f3f6; --btn-secondary-text:#2c3845; --btn-secondary-border:#d1dce5;
+    --btn-secondary-hover:#e4e9ed;
+    --footer-bg:rgba(255,255,255,0.5);
+
+    /* Paleta botones light mode */
+    --btn-green-1:#2FD874;
+    --btn-green-2:#12B767;
+    --btn-red-1:#FF5A5F;
+    --btn-red-2:#E23D3D;
+    --btn-gray-1:#e8eef4;
+    --btn-gray-2:#d8dfe6;
+    --btn-gray-border:#c1ccd7;
+  }
+
   html,body{
     height:100%;
     margin:0;
     font-family:system-ui,Segoe UI,Roboto,Arial;
     color:var(--text);
     background:transparent;
+    transition: background 0.3s ease, color 0.3s ease;
   }
   body::before{
     content:"";
@@ -457,10 +490,11 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     inset:0;
     z-index:-1;
     background:
-      radial-gradient(1000px 500px at 80% -10%, #1a2330 0%, transparent 60%),
-      radial-gradient(900px 400px at -10% 90%, #11202a 0%, transparent 55%),
+      radial-gradient(1000px 500px at 80% -10%, var(--gradient-1) 0%, transparent 60%),
+      radial-gradient(900px 400px at -10% 90%, var(--gradient-2) 0%, transparent 55%),
       var(--bg);
     background-repeat:no-repeat;
+    transition: background 0.3s ease;
   }
 
   header, footer{padding:16px; text-align:center}
@@ -468,11 +502,11 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   footer {
     margin-top: 40px;
     padding: 20px 16px;
-    background: linear-gradient(180deg, rgba(21, 26, 32, 0.6), rgba(15, 19, 24, 0.8));
+    background: var(--footer-bg);
     border-top: 1px solid var(--line);
     backdrop-filter: blur(10px);
   }
-  
+
   footer .footer-content {
     max-width: 1100px;
     margin: 0 auto;
@@ -483,19 +517,31 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     font-size: 14px;
     color: var(--muted);
   }
-  
+
   footer .footer-heart {
     color: #ff5c5c;
     animation: heartbeat 1.5s ease-in-out infinite;
     display: inline-block;
   }
-  
+
   footer .footer-by {
     font-weight: 600;
     background: linear-gradient(90deg, #3bdd82, #1bbf67);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  footer a {
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color .15s ease;
+  }
+
+  footer a:hover {
+    color: var(--brand-2);
+    text-decoration: underline;
   }
   
   @keyframes heartbeat {
@@ -547,14 +593,16 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     height:46px; padding:0 18px; min-width:120px;
     border-radius:12px; border:1px solid var(--btn-gray-border);
     background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2));
-    color:#E6EDF3; font-size:16px; font-weight:700; letter-spacing:.2px;
+    color:var(--text); font-size:16px; font-weight:700; letter-spacing:.2px;
     text-decoration:none; cursor:pointer; text-align:center; line-height:1; box-sizing:border-box;
-    transition:background .15s ease;
+    transition:background .15s ease, color .15s ease;
   }
   .btn:hover,.btn:focus-visible{ background:linear-gradient(180deg,#313C4B,#222A36); outline:none; }
+  [data-theme="light"] .btn:hover,[data-theme="light"] .btn:focus-visible{ background:linear-gradient(180deg,#d1dce5,#c1ccd7); }
   .btn.primary{ border:0; background:linear-gradient(135deg,var(--btn-green-1),var(--btn-green-2)); color:#fff; }
+  .btn.primary:hover, .btn.primary:focus-visible{ background:linear-gradient(135deg,#12B767,#0e9a52); }
   .btn.danger{ border:0; background:linear-gradient(135deg,var(--btn-red-1),var(--btn-red-2)); color:#fff; }
-  .btn.neutral{ background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2)); color:#E6EDF3; border:1px solid var(--btn-gray-border); }
+  .btn.neutral{ background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2)); color:var(--text); border:1px solid var(--btn-gray-border); }
 
   .upload-json-form {
     display:flex;
@@ -636,15 +684,15 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     width: 8px;
   }
   .communities-scroll::-webkit-scrollbar-track {
-    background: #0f141a;
+    background: var(--scrollbar-track);
     border-radius: 10px;
   }
   .communities-scroll::-webkit-scrollbar-thumb {
-    background: #2a3340;
+    background: var(--scrollbar-thumb);
     border-radius: 10px;
   }
   .communities-scroll::-webkit-scrollbar-thumb:hover {
-    background: #364456;
+    background: var(--scrollbar-thumb-hover);
   }
   
   .grid{display:grid;gap:12px}
@@ -654,13 +702,14 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     font-weight:800;
     font-size: 20px;
     line-height: 1.2;
+    color:var(--text);
   }
   .comm-actions{display:flex;gap:8px;flex-wrap:wrap}
   .codes{display:grid;gap:8px;margin-top:10px}
-  .code-row{display:flex;gap:12px;align-items:flex-start;background:#0f141a;border:1px solid var(--line);border-radius:12px;padding:10px}
+  .code-row{display:flex;gap:12px;align-items:flex-start;background:var(--input-bg-1);border:1px solid var(--line);border-radius:12px;padding:10px}
   .c-left{flex:1;display:flex;flex-direction:column;align-items:flex-start;text-align:left}
-  .code{font-family:ui-monospace,Menlo,Consolas,monospace; display:flex; align-items:center; gap:8px; font-size:17px;}
-  .note{color:#9fb0be;font-size:13px}
+  .code{font-family:ui-monospace,Menlo,Consolas,monospace; display:flex; align-items:center; gap:8px; font-size:17px; color:var(--text);}
+  .note{color:var(--muted);font-size:13px}
 
   .report-badge{
     display:inline-flex;
@@ -701,49 +750,49 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     width: 8px;
   }
   .codes-scroll-container::-webkit-scrollbar-track {
-    background: #0f141a;
+    background: var(--scrollbar-track);
     border-radius: 10px;
   }
   .codes-scroll-container::-webkit-scrollbar-thumb {
-    background: #2a3340;
+    background: var(--scrollbar-thumb);
     border-radius: 10px;
   }
   .codes-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #364456;
+    background: var(--scrollbar-thumb-hover);
   }
-  
+
   /* Custom Scrollbar for Add Community form - mantener solo para otros elementos */
   .form::-webkit-scrollbar {
     width: 8px;
   }
   .form::-webkit-scrollbar-track {
-    background: #0f141a;
+    background: var(--scrollbar-track);
     border-radius: 10px;
   }
   .form::-webkit-scrollbar-thumb {
-    background: #2a3340;
+    background: var(--scrollbar-thumb);
     border-radius: 10px;
   }
   .form::-webkit-scrollbar-thumb:hover {
-    background: #364456;
+    background: var(--scrollbar-thumb-hover);
   }
   
   .field{
-    width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid #2a3340;
-    background:linear-gradient(180deg,#0f141a,#0c1116); color:#e8eef4;
+    width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+    background:linear-gradient(180deg,var(--input-bg-1),var(--input-bg-2)); color:var(--text);
     outline:none; transition:border-color .15s ease, box-shadow .15s ease;
   }
-  .field::placeholder{ color:#8aa1b2 }
-  .field:focus{ border-color:#3bdd82; box-shadow:0 0 0 3px rgba(59,221,130,.15) }
+  .field::placeholder{ color:var(--muted) }
+  .field:focus{ border-color:var(--brand); box-shadow:0 0 0 3px rgba(59,221,130,.15) }
   textarea.field{ resize:vertical; min-height:90px }
 
-  .lbl > span{ display:block; margin-bottom:6px; color:#e8eef4; font-weight:600 }
+  .lbl > span{ display:block; margin-bottom:6px; color:var(--text); font-weight:600 }
   .lbl { margin-bottom: 0; }
   .codes-editor{display:grid;gap:10px}
 
   .code-edit-new{
     display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
-    gap:10px; align-items:start; background:#0f141a; border:1px solid var(--line);
+    gap:10px; align-items:start; background:var(--panel-2); border:1px solid var(--line);
     border-radius:12px; padding:12px; box-sizing:border-box;
   }
   .code-edit-new .row-wide { grid-column: 1 / -1; }
@@ -758,12 +807,12 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:9999; padding:20px; }
   .modal.open{ display:flex; }
-  .modal img{ max-width:min(90vw,1000px); max-height:80vh; object-fit:contain; border-radius:12px; border:1px solid #2a3340; background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
-  .modal .close{ position:absolute; top:14px; right:18px; font-size:28px; line-height:1; color:#e8eef4; cursor:pointer; user-select:none; background:transparent; border:none; padding:6px 10px; }
+  .modal img{ max-width:min(90vw,1000px); max-height:80vh; object-fit:contain; border-radius:12px; border:1px solid var(--border); background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
+  .modal .close{ position:absolute; top:14px; right:18px; font-size:28px; line-height:1; color:var(--text); cursor:pointer; user-select:none; background:transparent; border:none; padding:6px 10px; }
 
-  .mini{font-size:13px;color:#e8eef4;font-weight:600;margin-bottom:6px;display:block}
+  .mini{font-size:13px;color:var(--text);font-weight:600;margin-bottom:6px;display:block}
   .hr{height:1px;background:var(--line);margin:10px 0}
-  .flash{margin:10px auto;max-width:1100px;background:#0f141a;border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center}
+  .flash{margin:10px auto;max-width:1100px;background:var(--panel-2);border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;color:var(--text)}
 
   .actions-stack{
     width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;
@@ -785,8 +834,10 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   }
   .btn-primary {
     background: linear-gradient(135deg, #2FD874, #12B767);
+    color: #fff;
   }
   .btn-primary:hover {
+    background: linear-gradient(135deg, #12B767, #0e9a52);
     box-shadow: 0 6px 18px rgba(59,221,130,.55);
   }
   .btn-danger {
@@ -795,6 +846,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     box-shadow: 0 4px 14px rgba(255,92,92,.4);
   }
   .btn-danger:hover {
+    background: linear-gradient(135deg, #E23D3D, #c73030);
     box-shadow: 0 6px 18px rgba(255,92,92,.55);
   }
   .btn-primary:active, .btn-danger:active {
@@ -807,9 +859,72 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   @media (max-width: 768px) {
     .br-mobile { display: inline; }
   }
+
+  /* Theme Toggle Button */
+  .theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    z-index: 100;
+  }
+  .theme-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(59,221,130,.3);
+  }
+  .theme-toggle svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--brand);
+    transition: transform 0.3s ease;
+  }
+  .theme-toggle:hover svg {
+    transform: rotate(20deg);
+  }
+
+  @media (max-width: 768px) {
+    .theme-toggle {
+      width: 44px;
+      height: 44px;
+      top: 15px;
+      right: 15px;
+    }
+    .theme-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
 </style>
 </head>
 <body>
+  <!-- Theme Toggle Button -->
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+    <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <svg id="sunIcon" style="display:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="5"/>
+      <path d="M12 1L13 5L11 5Z"/>
+      <path d="M12 23L13 19L11 19Z"/>
+      <path d="M23 12L19 13L19 11Z"/>
+      <path d="M1 12L5 13L5 11Z"/>
+      <path d="M19.07 4.93L16 7.5L15 6.5Z"/>
+      <path d="M4.93 19.07L8 16.5L9 17.5Z"/>
+      <path d="M19.07 19.07L16.5 16L17.5 15Z"/>
+      <path d="M4.93 4.93L7.5 8L6.5 9Z"/>
+    </svg>
+  </button>
+
 <header>
   <a href="?key=<?=urlencode(ADMIN_KEY)?>" class="title">Gate Codes</a>
   <div class="sub">Admin Dashboard · Edit <code>gates.json</code></div>
@@ -1323,6 +1438,40 @@ document.addEventListener('click', (e)=>{
 });
 document.addEventListener('keydown', (e)=>{
   if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
+});
+
+// Theme Toggle Functionality
+const themeToggle = document.getElementById('themeToggle');
+const moonIcon = document.getElementById('moonIcon');
+const sunIcon = document.getElementById('sunIcon');
+const htmlElement = document.documentElement;
+
+// Load theme from localStorage or default to dark
+const savedTheme = localStorage.getItem('theme') || 'dark';
+if (savedTheme === 'light') {
+  htmlElement.setAttribute('data-theme', 'light');
+  moonIcon.style.display = 'block';
+  sunIcon.style.display = 'none';
+} else {
+  moonIcon.style.display = 'none';
+  sunIcon.style.display = 'block';
+}
+
+// Toggle theme
+themeToggle.addEventListener('click', () => {
+  const currentTheme = htmlElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+  htmlElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+
+  if (newTheme === 'light') {
+    moonIcon.style.display = 'block';
+    sunIcon.style.display = 'none';
+  } else {
+    moonIcon.style.display = 'none';
+    sunIcon.style.display = 'block';
+  }
 });
 </script>
 </body>
