@@ -1,0 +1,777 @@
+<?php
+// Set Florida timezone
+date_default_timezone_set('America/New_York');
+
+// PROCESS FORM SUBMISSION
+$flashMsg = '';
+$errorMsg = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $suggestFile = __DIR__ . '/data/suggest.json';
+
+  // Read existing suggestions
+  $suggestions = [];
+  if (file_exists($suggestFile)) {
+    $content = file_get_contents($suggestFile);
+    $suggestions = json_decode($content, true) ?: [];
+  }
+
+  // Get form data
+  $community = trim($_POST['community'] ?? '');
+  $city = trim($_POST['city'] ?? '');
+
+  // Validate required fields
+  if ($community === '') {
+    $errorMsg = 'Community name is required';
+  } else {
+    // Build codes array
+    $codes = [];
+    $codeInputs = $_POST['code'] ?? [];
+    $notesInputs = $_POST['notes'] ?? [];
+    $detailsInputs = $_POST['details'] ?? [];
+    $photoInputs = $_POST['photo'] ?? [];
+    $coordinatesInputs = $_POST['coordinates'] ?? [];
+
+    foreach ($codeInputs as $idx => $codeVal) {
+      $codeVal = trim($codeVal);
+      if ($codeVal !== '') {
+        $codeData = [
+          'code' => $codeVal,
+          'notes' => trim($notesInputs[$idx] ?? ''),
+          'details' => trim($detailsInputs[$idx] ?? ''),
+          'photo' => trim($photoInputs[$idx] ?? '')
+        ];
+
+        // Add coordinates if available
+        $coordsJson = trim($coordinatesInputs[$idx] ?? '');
+        if ($coordsJson !== '') {
+          $coords = json_decode($coordsJson, true);
+          if ($coords && isset($coords['latitude']) && isset($coords['longitude'])) {
+            $codeData['coordinates'] = $coords;
+          }
+        }
+
+        $codes[] = $codeData;
+      }
+    }
+
+    if (empty($codes)) {
+      $errorMsg = 'At least one code is required';
+    } else {
+      // Create suggestion entry
+      $suggestion = [
+        'community' => $community,
+        'codes' => $codes,
+        'submitted_date' => date('Y-m-d H:i:s')
+      ];
+
+      if ($city !== '') {
+        $suggestion['city'] = $city;
+      }
+
+      // Add to suggestions array
+      $suggestions[] = $suggestion;
+
+      // Save to file
+      $dir = dirname($suggestFile);
+      if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+      }
+
+      if (file_put_contents($suggestFile, json_encode($suggestions, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES))) {
+        $flashMsg = 'Your community submission has been received! Thank you for contributing.';
+      } else {
+        $errorMsg = 'Failed to save submission. Please try again.';
+      }
+    }
+  }
+}
+?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Submit Community · Gate Code</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
+    --text:#e8eef4; --muted:#93a0ad; --brand:#3bdd82; --brand-2:#1bbf67;
+    --danger:#ff5c5c; --danger-2:#e53935; --radius:14px;
+    --gradient-1:#1a2330; --gradient-2:#11202a;
+    --border:#2a3340; --border-2:#1e2a34;
+    --input-bg-1:#0f141a; --input-bg-2:#0c1116;
+    --scrollbar-track:#0f141a; --scrollbar-thumb:#2a3340; --scrollbar-thumb-hover:#364456;
+    --modal-bg-1:#1a1f26; --modal-bg-2:#12161c; --modal-border:#233041;
+    --btn-secondary-bg:#22272f; --btn-secondary-text:#d0d7de; --btn-secondary-border:#2e3947;
+    --btn-secondary-hover:#2a3240;
+    --footer-bg:rgba(15,19,24,0.5);
+  }
+
+  [data-theme="light"]{
+    --bg:#f5f7fa; --panel:#ffffff; --panel-2:#f8f9fa;
+    --text:#1a1f26; --muted:#5a6c7d; --brand:#3bdd82; --brand-2:#1bbf67;
+    --danger:#ff5c5c; --danger-2:#e53935; --radius:14px;
+    --gradient-1:#e0f5ee; --gradient-2:#d4ede2;
+    --border:#d1dce5; --border-2:#e1e8ed;
+    --input-bg-1:#ffffff; --input-bg-2:#f9fafb;
+    --scrollbar-track:#e8eef4; --scrollbar-thumb:#c1ccd7; --scrollbar-thumb-hover:#a8b5c2;
+    --modal-bg-1:#ffffff; --modal-bg-2:#f8f9fa; --modal-border:#d1dce5;
+    --btn-secondary-bg:#f0f3f6; --btn-secondary-text:#2c3845; --btn-secondary-border:#d1dce5;
+    --btn-secondary-hover:#e4e9ed;
+    --footer-bg:rgba(255,255,255,0.5);
+  }
+
+  html,body{
+    height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
+    background: var(--bg);
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(1000px 500px at 80% -10%, var(--gradient-1) 0%, transparent 60%),
+      radial-gradient(900px 400px at -10% 90%, var(--gradient-2) 0%, transparent 55%),
+      var(--bg);
+    background-repeat: no-repeat;
+    transition: background 0.3s ease;
+  }
+
+  body{display:flex;flex-direction:column;min-height:100vh}
+
+  main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    padding:40px 20px 60px 20px;
+    text-align:center;
+  }
+
+  h1{margin:0 0 10px 0;font-size:2rem}
+  .sub{color:var(--muted);margin-bottom:30px}
+
+  /* Title style */
+  .title {
+    font-size: 3rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 2px; margin: 0 0 15px 0;
+    background: linear-gradient(90deg, #3bdd82, #1bbf67);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative; display: inline-block; text-shadow: 0 2px 6px rgba(0,0,0,.3);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity .2s ease;
+  }
+  .title:hover {
+    opacity: 0.85;
+  }
+
+  /* Form Container */
+  .form-container {
+    width: 100%;
+    max-width: 700px;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .form-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 24px 0;
+    color: var(--text);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .field {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-size: 15px;
+    box-sizing: border-box;
+  }
+
+  .field::placeholder {
+    color: var(--muted);
+  }
+
+  .field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(59, 221, 130, .15);
+  }
+
+  textarea.field {
+    resize: vertical;
+    min-height: 90px;
+  }
+
+  /* Codes Section */
+  .codes-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .codes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    padding-right: 8px;
+  }
+
+  .code-item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .code-header .btn-danger {
+    flex-shrink: 0;
+  }
+
+  .code-number {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 1.1rem;
+  }
+
+  .code-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .code-full {
+    grid-column: 1 / -1;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    background: var(--panel-2);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #2FD874, #12B767);
+    border: 0;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #12B767, #0e9a52);
+    box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #FF5A5F, #E23D3D);
+    border: 0;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+  }
+
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #E23D3D, #c73030);
+    box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .form-actions {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  /* Footer */
+  footer{
+    padding:16px;
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
+    border-top:1px solid var(--border-2);
+    background:var(--footer-bg);
+  }
+  footer a{
+    color:var(--brand);
+    text-decoration:none;
+    font-weight:600;
+    transition:color .15s ease;
+  }
+  footer a:hover{
+    color:var(--brand-2);
+    text-decoration:underline;
+  }
+
+  /* Theme Toggle Button */
+  .theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    z-index: 100;
+  }
+  .theme-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(59,221,130,.3);
+  }
+  .theme-toggle svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--brand);
+    transition: transform 0.3s ease;
+  }
+  .theme-toggle:hover svg {
+    transform: rotate(20deg);
+  }
+
+  /* Alert */
+  .alert {
+    width: 100%;
+    max-width: 700px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    font-weight: 600;
+  }
+
+  .alert-success {
+    background: linear-gradient(135deg, rgba(59, 221, 130, 0.2), rgba(27, 191, 103, 0.15));
+    border: 1px solid var(--brand);
+    color: var(--brand);
+  }
+
+  .alert-error {
+    background: linear-gradient(135deg, rgba(255, 92, 92, 0.2), rgba(229, 57, 53, 0.15));
+    border: 1px solid var(--danger);
+    color: var(--danger);
+  }
+
+  .file-upload-wrapper {
+    position: relative;
+  }
+
+  .file-upload-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .file-upload-label:hover {
+    background: var(--panel-2);
+    transform: translateY(-1px);
+  }
+
+  .file-upload-input {
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    z-index: -1;
+  }
+
+  .file-name {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .title{font-size:2.2rem}
+
+    .form-container {
+      padding: 24px 20px;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .code-row {
+      grid-template-columns: 1fr;
+    }
+
+    .form-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .btn-group {
+      width: 100%;
+    }
+
+    .btn {
+      width: 100%;
+    }
+
+    .code-header {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .code-header .btn-danger {
+      width: auto;
+      padding: 8px 16px;
+      white-space: nowrap;
+    }
+
+    .theme-toggle {
+      width: 44px;
+      height: 44px;
+      top: 15px;
+      right: 15px;
+    }
+    .theme-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+</style>
+</head>
+<body>
+  <!-- Theme Toggle Button -->
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+    <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <svg id="sunIcon" style="display:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="5"/>
+      <path d="M12 1L13 5L11 5Z"/>
+      <path d="M12 23L13 19L11 19Z"/>
+      <path d="M23 12L19 13L19 11Z"/>
+      <path d="M1 12L5 13L5 11Z"/>
+      <path d="M19.07 4.93L16 7.5L15 6.5Z"/>
+      <path d="M4.93 19.07L8 16.5L9 17.5Z"/>
+      <path d="M19.07 19.07L16.5 16L17.5 15Z"/>
+      <path d="M4.93 4.93L7.5 8L6.5 9Z"/>
+    </svg>
+  </button>
+
+  <main>
+    <a href="index.php" class="title">Gate Codes</a>
+    <div class="sub">Submit a new community gate code</div>
+
+    <?php if ($flashMsg): ?>
+      <div class="alert alert-success"><?= htmlspecialchars($flashMsg) ?></div>
+    <?php endif; ?>
+
+    <?php if ($errorMsg): ?>
+      <div class="alert alert-error"><?= htmlspecialchars($errorMsg) ?></div>
+    <?php endif; ?>
+
+    <form class="form-container" method="POST" id="submitForm">
+      <h2 class="form-title">Community Information</h2>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Community Name *</label>
+          <input type="text" class="field" name="community" placeholder="e.g., Water Oaks" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">City Name</label>
+          <input type="text" class="field" name="city" placeholder="e.g., Orlando">
+        </div>
+      </div>
+
+      <div class="codes-section">
+        <h2 class="form-title">Gate Codes</h2>
+
+        <div id="codesList" class="codes-list">
+          <!-- Codes will be added here dynamically -->
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn" id="addCodeBtn">+ Add Code</button>
+          <div class="btn-group">
+            <a href="index.php" class="btn">Cancel</a>
+            <button type="submit" class="btn btn-primary">Submit Community</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <footer>
+    <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a> | <a href="index.php">Back to Search</a></span>
+  </footer>
+
+<script>
+// Theme Toggle Functionality
+const themeToggle = document.getElementById('themeToggle');
+const moonIcon = document.getElementById('moonIcon');
+const sunIcon = document.getElementById('sunIcon');
+const htmlElement = document.documentElement;
+
+// Load theme from localStorage or default to dark
+const savedTheme = localStorage.getItem('theme') || 'dark';
+htmlElement.setAttribute('data-theme', savedTheme);
+
+if (savedTheme === 'light') {
+  moonIcon.style.display = 'block';
+  sunIcon.style.display = 'none';
+} else {
+  moonIcon.style.display = 'none';
+  sunIcon.style.display = 'block';
+}
+
+// Toggle theme
+themeToggle.addEventListener('click', () => {
+  const currentTheme = htmlElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+  htmlElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+
+  if (newTheme === 'light') {
+    moonIcon.style.display = 'block';
+    sunIcon.style.display = 'none';
+  } else {
+    moonIcon.style.display = 'none';
+    sunIcon.style.display = 'block';
+  }
+});
+
+// Code Management
+let codeCounter = 0;
+
+function createCodeItem(index) {
+  const div = document.createElement('div');
+  div.className = 'code-item';
+  div.dataset.index = index;
+
+  div.innerHTML = `
+    <div class="code-header">
+      <span class="code-number">Code #${index + 1}</span>
+      <button type="button" class="btn btn-danger btn-remove-code" data-index="${index}">Remove</button>
+    </div>
+
+    <div class="code-row">
+      <div class="form-group">
+        <label class="form-label">Gate Code *</label>
+        <input type="text" class="field" name="code[]" placeholder="e.g., #1234" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="field" name="notes[]" placeholder="e.g., Main entrance">
+      </div>
+    </div>
+
+    <div class="form-group code-full">
+      <label class="form-label">Details</label>
+      <textarea class="field" name="details[]" placeholder="Additional details about this gate code..."></textarea>
+    </div>
+
+    <div class="form-group code-full">
+      <label class="form-label">Photo (optional)</label>
+      <div class="file-upload-wrapper">
+        <label class="file-upload-label">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span>Take Photo / Choose Image</span>
+          <input type="file" class="file-upload-input photo-input" accept="image/*" capture="environment" data-index="${index}">
+        </label>
+        <input type="hidden" name="photo[]" class="photo-path">
+        <input type="hidden" name="coordinates[]" class="photo-coordinates">
+        <div class="file-preview" style="margin-top: 12px; display: none;">
+          <img style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid var(--border);" alt="Preview">
+        </div>
+        <div class="file-name" style="margin-top: 8px; color: var(--muted); font-size: 0.85rem;"></div>
+      </div>
+    </div>
+  `;
+
+  return div;
+}
+
+function addCode() {
+  const codesList = document.getElementById('codesList');
+  const codeItem = createCodeItem(codeCounter);
+  codesList.appendChild(codeItem);
+  codeCounter++;
+  updateCodeNumbers();
+}
+
+// Event Listeners
+document.getElementById('addCodeBtn').addEventListener('click', addCode);
+
+// Handle photo uploads
+document.getElementById('codesList').addEventListener('change', async (e) => {
+  if (e.target.classList.contains('photo-input')) {
+    const fileInput = e.target;
+    const file = fileInput.files[0];
+
+    if (!file) return;
+
+    const wrapper = fileInput.closest('.file-upload-wrapper');
+    const fileNameDiv = wrapper.querySelector('.file-name');
+    const photoPath = wrapper.querySelector('.photo-path');
+    const preview = wrapper.querySelector('.file-preview');
+    const previewImg = preview.querySelector('img');
+
+    // Show preview immediately
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImg.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    fileNameDiv.textContent = 'Uploading...';
+    fileNameDiv.style.color = 'var(--brand)';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const response = await fetch('upload_temp.php', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        photoPath.value = result.path;
+
+        // Store coordinates if available
+        const coordinatesInput = wrapper.querySelector('.photo-coordinates');
+        if (result.coordinates) {
+          coordinatesInput.value = JSON.stringify(result.coordinates);
+          fileNameDiv.textContent = `✓ Photo uploaded with GPS: ${result.filename}`;
+        } else {
+          coordinatesInput.value = '';
+          fileNameDiv.textContent = `✓ Photo uploaded: ${result.filename}`;
+        }
+        fileNameDiv.style.color = 'var(--brand)';
+      } else {
+        fileNameDiv.textContent = `✗ Upload failed: ${result.message}`;
+        fileNameDiv.style.color = 'var(--danger)';
+        preview.style.display = 'none';
+      }
+    } catch (error) {
+      fileNameDiv.textContent = '✗ Upload error. Please try again.';
+      fileNameDiv.style.color = 'var(--danger)';
+      preview.style.display = 'none';
+    }
+  }
+});
+
+// Add initial code
+addCode();
+</script>
+</body>
+</html>

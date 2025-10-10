@@ -1,17 +1,18 @@
 <?php
 /******************** CONFIG ********************/
-// rutas de disco (sin cambio)
 const ADMIN_KEY   = '43982';
 const GATES_JSON  = __DIR__ . '/../data/gates.json';
+const SUGGEST_JSON = __DIR__ . '/../data/suggest.json';
+const PIN_JSON = __DIR__ . '/../data/pin.json';
 const ASSETS_DIR  = __DIR__ . '/../assets/';
+const TEMP_ASSETS_DIR = __DIR__ . '/../temp_assets/';
 const DEFAULT_THUMB_FILE = 'thumbnailnone.png';
 
-// URL base absoluta para /gatecodes/assets/ (normaliza ../)
-$APP_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/'); // ej: "/gatecodes"
-define('ASSETS_URL', $APP_URL . '/assets/');                     // ej: "/gatecodes/assets/" (solo para visualización)
-define('ASSETS_RELATIVE', 'assets/');                             // ruta relativa para guardar en JSON
-define('DEFAULT_THUMB_URL', ASSETS_RELATIVE . DEFAULT_THUMB_FILE); // ej: "assets/thumbnailnone.png"
-
+$APP_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
+define('ASSETS_URL', $APP_URL . '/assets/');
+define('TEMP_ASSETS_URL', $APP_URL . '/temp_assets/');
+define('ASSETS_RELATIVE', 'assets/');
+define('DEFAULT_THUMB_URL', ASSETS_RELATIVE . DEFAULT_THUMB_FILE);
 
 /* Minimal auth */
 function require_key(){
@@ -27,6 +28,7 @@ function read_json($path){
   flock($h,LOCK_SH); $s=stream_get_contents($h); flock($h,LOCK_UN); fclose($h);
   $j=json_decode($s,true); return is_array($j)?$j:[];
 }
+
 function write_json($path,$data){
   $dir = dirname($path);
   if(!is_dir($dir)) @mkdir($dir, 0775, true);
@@ -35,24 +37,18 @@ function write_json($path,$data){
   fflush($h); flock($h,LOCK_UN); fclose($h);
   return @rename($tmp,$path);
 }
-/* Normaliza la URL web de la foto para el panel (acepta http(s), /absoluto, ../assets, assets/, nombre suelto) */
+
 function web_photo($p){
   $p = trim((string)$p);
   if ($p === '') return DEFAULT_THUMB_URL;
-
-  // http(s) o absoluto desde raíz → úsalo tal cual
   if (preg_match('#^(https?:)?//#', $p)) return $p;
   if ($p[0] === '/') return $p;
-
-  // quita prefijos relativos y enruta a ASSETS_URL
-  $p = ltrim($p, './'); // quita "./" o "../" iniciales
-  if (stripos($p, 'assets/') === 0) $p = substr($p, 7);         // deja solo el nombre relativo dentro de assets/
+  $p = ltrim($p, './');
+  if (stripos($p, 'assets/') === 0) $p = substr($p, 7);
   if (stripos($p, '../assets/') === 0) $p = substr($p, 10);
-
   return ASSETS_URL . ltrim($p, '/');
 }
 
-/* Normalización */
 function norm($s){
   $s = mb_strtolower((string)$s, 'UTF-8');
   $map = [
@@ -67,18 +63,19 @@ function norm($s){
   $s = preg_replace('/\s+/', ' ', $s);
   return trim($s);
 }
+
 function find_comm_index(&$data,$community){
   $q=norm($community);
   foreach($data as $i=>$c){ if (norm($c['community'] ?? '') === $q) return $i; }
   return -1;
 }
 
-/* Paths seguros para borrar fotos */
 function path_join($base, $rel){
   $base = rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
   $rel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
   return $base . ltrim($rel, DIRECTORY_SEPARATOR);
 }
+
 function photo_url_to_path($url){
   $url = trim((string)$url);
   if ($url === '' || $url === DEFAULT_THUMB_URL) return '';
@@ -107,6 +104,7 @@ function photo_url_to_path($url){
   if (basename($fileReal) === DEFAULT_THUMB_FILE) return '';
   return $fileReal;
 }
+
 function delete_photo_by_url($url){
   $p = photo_url_to_path($url);
   if ($p === '') return true;
@@ -114,34 +112,27 @@ function delete_photo_by_url($url){
   return @unlink($p);
 }
 
-/******************** DOWNLOAD JSON ********************/
-if (isset($_GET['download_json'])) {
-  if (!file_exists(GATES_JSON)) {
-    http_response_code(404);
-    exit('gates.json not found');
-  }
-  
-  header('Content-Type: application/json');
-  header('Content-Disposition: attachment; filename="gates_backup_' . date('Y-m-d_His') . '.json"');
-  header('Content-Length: ' . filesize(GATES_JSON));
-  readfile(GATES_JSON);
-  exit;
+/******************** COUNT SUGGESTIONS ********************/
+$suggest_count = 0;
+if(file_exists(SUGGEST_JSON)){
+  $suggestions = read_json(SUGGEST_JSON);
+  $suggest_count = count($suggestions);
 }
 
-/******************** AJAX: UPLOAD (single-row) ********************/
+/******************** API ENDPOINTS ********************/
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+$msg = '';
+
+// AJAX: UPLOAD PHOTO
 if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
   header('Content-Type: application/json');
-
   $MAX_BYTES = 16 * 1024 * 1024;
-
   $out = function($status, $extra = []) {
     http_response_code($status === 'ok' ? 200 : (http_response_code() ?: 400));
     echo json_encode(array_merge(['status'=>$status], $extra));
     exit;
   };
-
   if (!isset($_FILES['photo'])) $out('fail', ['error'=>'no_file']);
-
   $f = $_FILES['photo'];
   if ($f['error'] !== UPLOAD_ERR_OK) {
     $map = [
@@ -157,24 +148,26 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
     if (in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) { http_response_code(413); }
     $out('fail', ['error'=>$code]);
   }
-
   if ($f['size'] > $MAX_BYTES) { http_response_code(413); $out('fail', ['error'=>'too_large']); }
-
   if (!is_dir(ASSETS_DIR) && !@mkdir(ASSETS_DIR, 0775, true)) $out('fail', ['error'=>'assets_dir_create_failed']);
   if (!is_writable(ASSETS_DIR)) $out('fail', ['error'=>'assets_not_writable']);
-
   $tmp  = $f['tmp_name'];
   if (!is_uploaded_file($tmp)) $out('fail', ['error'=>'invalid_tmp']);
-
   $finfo = new finfo(FILEINFO_MIME_TYPE);
   $mime = $finfo->file($tmp) ?: 'application/octet-stream';
-
   $allowed_native = ['image/jpeg','image/png','image/webp'];
   $needs_convert  = ['image/heic','image/heif'];
 
-  $base = 'gate_'.date('Ymd_His').'_'.bin2hex(random_bytes(3));
+  // Use community name for filename if provided
+  $community_name = $_POST['community_name'] ?? '';
+  if ($community_name) {
+    // Sanitize community name for filename
+    $safe_name = preg_replace('/[^a-zA-Z0-9_-]/', '_', strtolower($community_name));
+    $base = 'gate_' . $safe_name . '_' . date('Ymd_His');
+  } else {
+    $base = 'gate_'.date('Ymd_His').'_'.bin2hex(random_bytes(3));
+  }
   $dest = '';
-
   if (in_array($mime, $needs_convert, true)) {
     if (class_exists('Imagick')) {
       try {
@@ -193,7 +186,6 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
     echo json_encode(['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)]);
     exit;
   }
-
   if (!in_array($mime, $allowed_native, true)) {
     $out('fail', ['error'=>"type_{$mime}_not_allowed"]);
   }
@@ -204,50 +196,51 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
     default      => ''
   };
   if ($ext === '') $out('fail', ['error'=>'ext_resolve_failed']);
-
   $dest = ASSETS_DIR.$base.$ext;
   if (!@move_uploaded_file($tmp, $dest)) $out('fail', ['error'=>'move_failed']);
-
   echo json_encode(['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)]);
   exit;
 }
 
-/******************** ACTIONS (POST) ********************/
-$action = $_POST['action'] ?? '';
-$msg = '';
+// DOWNLOAD JSON
+if ($action === 'download_json') {
+  if (!file_exists(GATES_JSON)) {
+    http_response_code(404);
+    exit('gates.json not found');
+  }
+  header('Content-Type: application/json');
+  header('Content-Disposition: attachment; filename="gates_backup_' . date('Y-m-d_His') . '.json"');
+  header('Content-Length: ' . filesize(GATES_JSON));
+  readfile(GATES_JSON);
+  exit;
+}
 
+// UPLOAD JSON
 if ($action === 'upload_json') {
   if (!isset($_FILES['json_file'])) {
     $msg = 'No file selected.';
   } else {
     $file = $_FILES['json_file'];
-    
     if ($file['error'] !== UPLOAD_ERR_OK) {
       $msg = 'Upload error: ' . $file['error'];
-    } else if ($file['size'] > 5 * 1024 * 1024) { // 5MB max
+    } else if ($file['size'] > 5 * 1024 * 1024) {
       $msg = 'File too large (max 5MB).';
     } else {
-      // Validate JSON
       $content = file_get_contents($file['tmp_name']);
       $json = json_decode($content, true);
-      
       if (json_last_error() !== JSON_ERROR_NONE) {
         $msg = 'Invalid JSON file: ' . json_last_error_msg();
       } else if (!is_array($json)) {
         $msg = 'JSON must be an array.';
       } else {
-        // Create backup before overwriting
         $backup_dir = dirname(GATES_JSON) . '/backups';
         if (!is_dir($backup_dir)) @mkdir($backup_dir, 0775, true);
-        
         $backup_file = $backup_dir . '/gates_backup_' . date('Y-m-d_His') . '.json';
         if (file_exists(GATES_JSON)) {
           @copy(GATES_JSON, $backup_file);
         }
-        
-        // Write new file
         if (write_json(GATES_JSON, $json)) {
-          header('Location: ?key=' . urlencode(ADMIN_KEY) . '&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
+          header('Location: ?key=' . urlencode(ADMIN_KEY) . '&section=backup&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
           exit;
         } else {
           $msg = 'Failed to write JSON file.';
@@ -257,55 +250,23 @@ if ($action === 'upload_json') {
   }
 }
 
+// ADD COMMUNITY
 if ($action === 'add') {
   $data = read_json(GATES_JSON);
   $community = trim($_POST['community'] ?? '');
-  if ($community===''){ $msg='Missing community name.'; }
-  else {
+  $city = trim($_POST['city'] ?? '');
+  if ($community===''){
+    $msg='Missing community name.';
+  } else {
     $codes = [];
     $rows = $_POST['codes'] ?? [];
-    foreach ($rows as $r){
-      $code = trim($r['code'] ?? '');
-      if($code==='') continue;
-      $entry = ['code'=>$code];
-      foreach(['notes','details','photo'] as $k){
-        $v=trim($r[$k]??'');
-        if($k==='photo' && $v===''){ $v = DEFAULT_THUMB_URL; }
-        if($v!=='') $entry[$k]=$v;
-      }
-      $codes[] = $entry;
-    }
-    if(empty($codes)){ $msg='Add at least one code.'; }
-    else{
-      $i = find_comm_index($data,$community);
-      if($i>=0){
-        header('Location: ?key='.urlencode(ADMIN_KEY).'&edit='.urlencode($community).'&flash='.urlencode('Community already exists, opening it.'));
-        exit;
-      } else {
-        $data[] = ['community'=>$community, 'codes'=>$codes];
-        write_json(GATES_JSON,$data);
-        header('Location: ?key='.urlencode(ADMIN_KEY).'&edit='.urlencode($community).'&flash='.urlencode('Saved.'));
-        exit;
-      }
-    }
-  }
-}
 
-if ($action === 'update') {
-  $data = read_json(GATES_JSON);
-  $original = trim($_POST['original'] ?? '');
-  $idx = find_comm_index($data,$original);
-  if ($idx<0){ $msg='Community not found.'; }
-  else {
-    $new_name = trim($_POST['community'] ?? $original);
-    $rows = $_POST['codes'] ?? [];
-
-    // Find an existing photo from this community's codes
+    // Find existing photo from community if it exists
     $existing_photo = null;
-    if (isset($data[$idx]['codes'])) {
+    $idx = find_comm_index($data, $community);
+    if ($idx >= 0 && isset($data[$idx]['codes'])) {
       foreach ($data[$idx]['codes'] as $existing_code) {
         $photo = trim($existing_code['photo'] ?? '');
-        // Skip default thumbnails (both relative and absolute paths)
         if ($photo !== '' &&
             $photo !== DEFAULT_THUMB_URL &&
             $photo !== 'assets/thumbnailnone.png' &&
@@ -316,6 +277,86 @@ if ($action === 'update') {
       }
     }
 
+    foreach ($rows as $r){
+      $code = trim($r['code'] ?? '');
+      if($code==='') continue;
+      $entry = ['code'=>$code];
+      foreach(['notes','details','photo'] as $k){
+        $v=trim($r[$k]??'');
+        if($k==='photo'){
+          if($v==='' || $v===DEFAULT_THUMB_URL){
+            // Use existing community photo if available, otherwise default
+            $v = $existing_photo ?? DEFAULT_THUMB_URL;
+          }
+        }
+        if($v!=='') $entry[$k]=$v;
+      }
+      $codes[] = $entry;
+    }
+
+    if(empty($codes)){
+      $msg='Add at least one code.';
+    } else {
+      if($idx>=0){
+        // Community exists, check for duplicate codes
+        $existing_codes = array_column($data[$idx]['codes'], 'code');
+        $added_count = 0;
+        foreach($codes as $new_code){
+          if(!in_array($new_code['code'], $existing_codes)){
+            $data[$idx]['codes'][] = $new_code;
+            $added_count++;
+          }
+        }
+        if($added_count > 0){
+          // Update city if provided
+          if ($city !== '') {
+            $data[$idx]['city'] = $city;
+          }
+          write_json(GATES_JSON,$data);
+          header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode("Added {$added_count} new code(s) to existing community."));
+          exit;
+        } else {
+          $msg = 'All codes already exist in this community.';
+        }
+      } else {
+        // New community
+        $newCommunity = ['community'=>$community, 'codes'=>$codes];
+        if ($city !== '') {
+          $newCommunity['city'] = $city;
+        }
+        $data[] = $newCommunity;
+        write_json(GATES_JSON,$data);
+        header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community added successfully.'));
+        exit;
+      }
+    }
+  }
+}
+
+// UPDATE COMMUNITY
+if ($action === 'update') {
+  $data = read_json(GATES_JSON);
+  $original = trim($_POST['original'] ?? '');
+  $idx = find_comm_index($data,$original);
+  if ($idx<0){
+    $msg='Community not found.';
+  } else {
+    $new_name = trim($_POST['community'] ?? $original);
+    $city = trim($_POST['city'] ?? '');
+    $rows = $_POST['codes'] ?? [];
+    $existing_photo = null;
+    if (isset($data[$idx]['codes'])) {
+      foreach ($data[$idx]['codes'] as $existing_code) {
+        $photo = trim($existing_code['photo'] ?? '');
+        if ($photo !== '' &&
+            $photo !== DEFAULT_THUMB_URL &&
+            $photo !== 'assets/thumbnailnone.png' &&
+            stripos($photo, 'thumbnailnone.png') === false) {
+          $existing_photo = $photo;
+          break;
+        }
+      }
+    }
     $codes=[];
     foreach($rows as $r){
       $code=trim($r['code']??''); if($code==='') continue;
@@ -323,31 +364,34 @@ if ($action === 'update') {
       foreach(['notes','details','photo'] as $k){
         $v=trim($r[$k]??'');
         if($k==='photo' && $v===''){
-          // Use existing photo from community if available, otherwise use default
           $v = $existing_photo ?? DEFAULT_THUMB_URL;
         }
         if($v!=='') $entry[$k]=$v;
       }
       $codes[]=$entry;
     }
-    if(empty($codes)){ $msg='Add at least one code.'; }
-    else{
-      $data[$idx] = ['community'=>$new_name,'codes'=>$codes];
+    if(empty($codes)){
+      $msg='Add at least one code.';
+    } else {
+      $updatedCommunity = ['community'=>$new_name,'codes'=>$codes];
+      if ($city !== '') {
+        $updatedCommunity['city'] = $city;
+      }
+      $data[$idx] = $updatedCommunity;
       write_json(GATES_JSON,$data);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&edit='.urlencode($new_name).'&flash='.urlencode('Updated.'));
+      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community updated successfully.'));
       exit;
     }
   }
 }
 
-/* eliminar código individual + foto, permaneciendo en edición */
+// DELETE CODE
 if ($action === 'delete_code') {
   $data = read_json(GATES_JSON);
   $comm = trim($_POST['community']??'');
   $code = trim($_POST['code']??'');
   $idx = find_comm_index($data,$comm);
   $failed = [];
-
   if($idx>=0){
     $list = $data[$idx]['codes'] ?? [];
     $new=[];
@@ -366,26 +410,25 @@ if ($action === 'delete_code') {
     if(empty($new)) {
       array_splice($data,$idx,1);
       write_json(GATES_JSON,$data);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&flash='.urlencode('Code deleted. Community emptied and removed.'));
+      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
       exit;
     }
     write_json(GATES_JSON,$data);
     $flash='Code deleted.';
-    if ($failed) { $flash .= ' (No se pudo borrar: '.implode(', ', $failed).')'; }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&edit='.urlencode($comm).'&flash='.urlencode($flash));
+    if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
     exit;
   } else {
     $msg='Community not found.';
   }
 }
 
-/* eliminar comunidad completa + fotos */
+// DELETE COMMUNITY
 if ($action === 'delete_comm') {
   $data = read_json(GATES_JSON);
   $comm = trim($_POST['community']??'');
   $idx = find_comm_index($data,$comm);
   $failed = [];
-
   if($idx>=0){
     $codes = $data[$idx]['codes'] ?? [];
     foreach($codes as $c){
@@ -397,17 +440,168 @@ if ($action === 'delete_comm') {
     array_splice($data,$idx,1);
     write_json(GATES_JSON,$data);
     $flash='Community deleted.';
-    if ($failed) { $flash .= ' (No se pudo borrar: '.implode(', ', $failed).')'; }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&flash='.urlencode($flash));
+    if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
     exit;
   } else {
     $msg='Community not found.';
   }
 }
 
+// APPROVE CONTRIBUTION
+if ($action === 'approve_contribution') {
+  $suggestions = read_json(SUGGEST_JSON);
+  $index = intval($_POST['index'] ?? -1);
+
+  if ($index >= 0 && $index < count($suggestions)) {
+    $suggestion = $suggestions[$index];
+    $gates_data = read_json(GATES_JSON);
+
+    // Move photo from temp to assets
+    $photo = $suggestion['photo'] ?? '';
+    $new_photo = '';
+    if ($photo && strpos($photo, 'temp_assets/') !== false) {
+      $filename = basename($photo);
+      $temp_path = TEMP_ASSETS_DIR . $filename;
+      $new_path = ASSETS_DIR . $filename;
+      if (file_exists($temp_path)) {
+        if (!is_dir(ASSETS_DIR)) @mkdir(ASSETS_DIR, 0775, true);
+        if (@copy($temp_path, $new_path)) {
+          @unlink($temp_path);
+          $new_photo = ASSETS_RELATIVE . $filename;
+        }
+      }
+    } else {
+      $new_photo = $photo;
+    }
+
+    // Add to gates.json
+    $community = trim($suggestion['community'] ?? '');
+    $idx = find_comm_index($gates_data, $community);
+    $new_code = [
+      'code' => $suggestion['code'] ?? '',
+      'notes' => $suggestion['notes'] ?? '',
+      'details' => $suggestion['details'] ?? '',
+      'photo' => $new_photo ?: DEFAULT_THUMB_URL
+    ];
+
+    if ($idx >= 0) {
+      $gates_data[$idx]['codes'][] = $new_code;
+    } else {
+      $gates_data[] = [
+        'community' => $community,
+        'codes' => [$new_code]
+      ];
+    }
+
+    write_json(GATES_JSON, $gates_data);
+
+    // Remove from suggestions
+    array_splice($suggestions, $index, 1);
+    write_json(SUGGEST_JSON, $suggestions);
+
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution approved successfully.'));
+    exit;
+  } else {
+    $msg = 'Invalid contribution index.';
+  }
+}
+
+// DELETE CONTRIBUTION
+if ($action === 'delete_contribution') {
+  $suggestions = read_json(SUGGEST_JSON);
+  $index = intval($_POST['index'] ?? -1);
+
+  if ($index >= 0 && $index < count($suggestions)) {
+    $suggestion = $suggestions[$index];
+
+    // Delete photo from temp_assets
+    $photo = $suggestion['photo'] ?? '';
+    if ($photo && strpos($photo, 'temp_assets/') !== false) {
+      $filename = basename($photo);
+      $temp_path = TEMP_ASSETS_DIR . $filename;
+      if (file_exists($temp_path)) {
+        @unlink($temp_path);
+      }
+    }
+
+    // Remove from suggestions
+    array_splice($suggestions, $index, 1);
+    write_json(SUGGEST_JSON, $suggestions);
+
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution deleted.'));
+    exit;
+  } else {
+    $msg = 'Invalid contribution index.';
+  }
+}
+
+// SETTINGS: ADD PIN
+if ($action === 'add_pin') {
+  $pins = read_json(PIN_JSON);
+  $name = trim($_POST['pin_name'] ?? '');
+  $pin = trim($_POST['pin_value'] ?? '');
+
+  if ($name === '' || $pin === '') {
+    $msg = 'Name and PIN are required.';
+  } else {
+    $pins[] = [
+      'name' => $name,
+      'pin' => $pin,
+      'date' => date('Y-m-d H:i:s')
+    ];
+    write_json(PIN_JSON, $pins);
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN added successfully.'));
+    exit;
+  }
+}
+
+// SETTINGS: UPDATE PIN
+if ($action === 'update_pin') {
+  $pins = read_json(PIN_JSON);
+  $index = intval($_POST['index'] ?? -1);
+  $name = trim($_POST['pin_name'] ?? '');
+  $pin = trim($_POST['pin_value'] ?? '');
+
+  if ($index >= 0 && $index < count($pins)) {
+    if ($name === '' || $pin === '') {
+      $msg = 'Name and PIN are required.';
+    } else {
+      $pins[$index]['name'] = $name;
+      $pins[$index]['pin'] = $pin;
+      write_json(PIN_JSON, $pins);
+      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN updated successfully.'));
+      exit;
+    }
+  } else {
+    $msg = 'Invalid PIN index.';
+  }
+}
+
+// SETTINGS: DELETE PIN
+if ($action === 'delete_pin') {
+  $pins = read_json(PIN_JSON);
+  $index = intval($_POST['index'] ?? -1);
+
+  if ($index >= 0 && $index < count($pins)) {
+    array_splice($pins, $index, 1);
+    write_json(PIN_JSON, $pins);
+    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN deleted successfully.'));
+    exit;
+  } else {
+    $msg = 'Invalid PIN index.';
+  }
+}
+
 /******************** DATA + FILTER ********************/
+// Set current page for sidebar active state
+$current_page = 'home';
+
 $data = read_json(GATES_JSON);
+$suggestions = read_json(SUGGEST_JSON);
+$pins = read_json(PIN_JSON);
 $q = trim($_GET['q'] ?? '');
+$section = trim($_GET['section'] ?? 'home');
 $edit = trim($_GET['edit'] ?? '');
 $msg = $_GET['flash'] ?? $msg;
 
@@ -428,7 +622,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin · Gate Code</title>
+<title>Admin Dashboard · Gate Code</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
@@ -442,15 +636,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-secondary-bg:#22272f; --btn-secondary-text:#d0d7de; --btn-secondary-border:#2e3947;
     --btn-secondary-hover:#2a3240;
     --footer-bg:rgba(15,19,24,0.5);
-
-    /* Paleta botones */
-    --btn-green-1:#2FD874;
-    --btn-green-2:#12B767;
-    --btn-red-1:#FF5A5F;
-    --btn-red-2:#E23D3D;
-    --btn-gray-1:#2B3440;
-    --btn-gray-2:#1F2630;
-    --btn-gray-border:#394556;
+    --sidebar-width:260px;
   }
 
   [data-theme="light"]{
@@ -465,1014 +651,1975 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-secondary-bg:#f0f3f6; --btn-secondary-text:#2c3845; --btn-secondary-border:#d1dce5;
     --btn-secondary-hover:#e4e9ed;
     --footer-bg:rgba(255,255,255,0.5);
-
-    /* Paleta botones light mode */
-    --btn-green-1:#2FD874;
-    --btn-green-2:#12B767;
-    --btn-red-1:#FF5A5F;
-    --btn-red-2:#E23D3D;
-    --btn-gray-1:#e8eef4;
-    --btn-gray-2:#d8dfe6;
-    --btn-gray-border:#c1ccd7;
   }
 
-  html,body{
-    height:100%;
-    margin:0;
-    font-family:system-ui,Segoe UI,Roboto,Arial;
-    color:var(--text);
-    background:transparent;
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui, Segoe UI, Roboto, Arial;
+    color: var(--text);
+    background: var(--bg);
     transition: background 0.3s ease, color 0.3s ease;
   }
-  body::before{
-    content:"";
-    position:fixed;
-    inset:0;
-    z-index:-1;
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
     background:
       radial-gradient(1000px 500px at 80% -10%, var(--gradient-1) 0%, transparent 60%),
       radial-gradient(900px 400px at -10% 90%, var(--gradient-2) 0%, transparent 55%),
       var(--bg);
-    background-repeat:no-repeat;
+    background-repeat: no-repeat;
     transition: background 0.3s ease;
   }
 
-  header, footer{padding:16px; text-align:center}
-  
-  footer {
-    margin-top: 40px;
-    padding: 20px 16px;
-    background: var(--footer-bg);
-    border-top: 1px solid var(--line);
-    backdrop-filter: blur(10px);
+  /* SIDEBAR */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    transition: transform 0.3s ease;
   }
 
-  footer .footer-content {
-    max-width: 1100px;
-    margin: 0 auto;
+  .sidebar-header {
+    padding: 24px 20px;
+    border-bottom: 1px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    font-size: 14px;
-    color: var(--muted);
+    gap: 12px;
+    flex-shrink: 0;
   }
 
-  footer .footer-heart {
-    color: #ff5c5c;
-    animation: heartbeat 1.5s ease-in-out infinite;
-    display: inline-block;
-  }
-
-  footer .footer-by {
-    font-weight: 600;
+  .sidebar-logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     background: linear-gradient(90deg, #3bdd82, #1bbf67);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-  }
-
-  footer a {
-    color: var(--brand);
-    text-decoration: none;
-    font-weight: 600;
-    transition: color .15s ease;
-  }
-
-  footer a:hover {
-    color: var(--brand-2);
-    text-decoration: underline;
-  }
-  
-  @keyframes heartbeat {
-    0%, 100% { transform: scale(1); }
-    25% { transform: scale(1.1); }
-    50% { transform: scale(1); }
-  }
-  
-  .sub{color:var(--muted);margin-top:6px}
-
-  /* Title style del front page */
-  .title {
-    font-size: 3rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: 2px; margin: 0;
-    background: linear-gradient(90deg, #3bdd82, #1bbf67);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-    position: relative; display: inline-block; text-shadow: 0 2px 6px rgba(0,0,0,.3);
-    cursor: pointer;
     text-decoration: none;
   }
-  .title:hover {
-    opacity: 0.9;
-  }
-  .title::after {
-    content:""; position: absolute; left: 0; bottom: -6px; width: 100%; height: 3px;
-    background: linear-gradient(90deg, #3bdd82, #1bbf67);
-    border-radius: 2px; transform: scaleX(0); transform-origin: left;
-    transition: transform 0.6s ease-in-out;
-  }
-  .title:hover::after {
-    transform: scaleX(1);
-  }
 
-  .json-actions {
-    max-width:1100px;
-    margin:20px auto 20px;
-    padding:0 12px;
-    display:flex;
-    gap:12px;
-    justify-content:center;
-    flex-wrap:wrap;
-  }
-
-  .btn,
-  .btn:link,
-  .btn:visited{
-    display:inline-flex; align-items:center; justify-content:center;
-    height:46px; padding:0 18px; min-width:120px;
-    border-radius:12px; border:1px solid var(--btn-gray-border);
-    background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2));
-    color:var(--text); font-size:16px; font-weight:700; letter-spacing:.2px;
-    text-decoration:none; cursor:pointer; text-align:center; line-height:1; box-sizing:border-box;
-    transition:background .15s ease, color .15s ease;
-  }
-  .btn:hover,.btn:focus-visible{ background:linear-gradient(180deg,#313C4B,#222A36); outline:none; }
-  [data-theme="light"] .btn:hover,[data-theme="light"] .btn:focus-visible{ background:linear-gradient(180deg,#d1dce5,#c1ccd7); }
-  .btn.primary{ border:0; background:linear-gradient(135deg,var(--btn-green-1),var(--btn-green-2)); color:#fff; }
-  .btn.primary:hover, .btn.primary:focus-visible{ background:linear-gradient(135deg,#12B767,#0e9a52); }
-  .btn.danger{ border:0; background:linear-gradient(135deg,var(--btn-red-1),var(--btn-red-2)); color:#fff; }
-  .btn.neutral{ background:linear-gradient(180deg,var(--btn-gray-1),var(--btn-gray-2)); color:var(--text); border:1px solid var(--btn-gray-border); }
-
-  .upload-json-form {
-    display:flex;
-    gap:8px;
-    align-items:center;
-  }
-  
-  .upload-json-form input[type="file"] {
-    display:none;
-  }
-
-  .wrap{
-    max-width:1100px; margin:0 auto 28px; padding:0 12px;
-    display:grid; grid-template-columns: 7fr 3fr; gap:16px; align-items:start;
-  }
-
-  .wrap.edit-mode {
-    grid-template-columns: 1fr;
-  }
-
-  @media (max-width:900px){
-    .wrap{ grid-template-columns:1fr; gap: 24px; }
-    .title { font-size: 2.2rem; }
-    .card:first-child { order: 2; }
-    .card:last-child { order: 1; }
-  }
-
-  .card{
-    background:linear-gradient(180deg,var(--panel),var(--panel-2));
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:14px;
-    display: flex;
-    flex-direction: column;
-    /*height: 100%;*/
-    height: 100%;
-    max-height: 700px;
-  }
-
-  .wrap.edit-mode .card {
-    max-height: 800px;
-  }
-
-  .wrap.edit-mode .card.add-community-card {
-    display: none;
-  }
-  
-  .card-header {
-    flex-shrink: 0;
-  }
-  
-  .card h2{margin:0 0 12px 0}
-  .muted{color:var(--muted)}
-
-  /* Search form inside Communities */
-  .search-inline {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .search-inline .field {
-    flex: 1;
-  }
-  .search-inline .btn {
-    min-width: 100px;
-  }
-  
-  /* Scroll container for communities list */
-  .communities-scroll{
-    flex: 1;
-    overflow-y:auto;
-    overflow-x:hidden;
-    padding-right:8px;
-    min-height: 0;
-  }
-  
-  /* Custom Scrollbar for communities */
-  .communities-scroll::-webkit-scrollbar {
-    width: 8px;
-  }
-  .communities-scroll::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-    border-radius: 10px;
-  }
-  .communities-scroll::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 10px;
-  }
-  .communities-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
-  }
-  
-  .grid{display:grid;gap:12px}
-  .comm{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px}
-  .comm-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
-  .comm-name{
-    font-weight:800;
-    font-size: 20px;
-    line-height: 1.2;
-    color:var(--text);
-  }
-  .comm-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .codes{display:grid;gap:8px;margin-top:10px}
-  .code-row{display:flex;gap:12px;align-items:flex-start;background:var(--input-bg-1);border:1px solid var(--line);border-radius:12px;padding:10px}
-  .c-left{flex:1;display:flex;flex-direction:column;align-items:flex-start;text-align:left}
-  .code{font-family:ui-monospace,Menlo,Consolas,monospace; display:flex; align-items:center; gap:8px; font-size:17px; color:var(--text);}
-  .note{color:var(--muted);font-size:13px}
-
-  .report-badge{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width:20px;
-    height:20px;
-    min-width:20px;
-    min-height:20px;
-    max-width:20px;
-    max-height:20px;
-    background:#ff3b3b;
-    color:#fff;
-    font-size:11px;
-    font-weight:600;
-    border-radius:50%;
-    font-family:system-ui,Segoe UI,Roboto,Arial;
-    flex-shrink:0;
-    line-height:20px;
-    box-sizing:border-box;
-    text-align:center;
-  }
-  .thumb{ width:80px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000; cursor: zoom-in; }
-
-  .form{display:grid;gap:16px; overflow:visible; min-height: 0;}
-  
-  /* Contenedor con scroll para codes-editor */
-  .codes-scroll-container {
-    max-height: 350px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 8px;
-    margin-bottom: 12px;
-  }
-  
-  /* Custom Scrollbar for codes editor */
-  .codes-scroll-container::-webkit-scrollbar {
-    width: 8px;
-  }
-  .codes-scroll-container::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-    border-radius: 10px;
-  }
-  .codes-scroll-container::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 10px;
-  }
-  .codes-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
-  }
-
-  /* Custom Scrollbar for Add Community form - mantener solo para otros elementos */
-  .form::-webkit-scrollbar {
-    width: 8px;
-  }
-  .form::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-    border-radius: 10px;
-  }
-  .form::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 10px;
-  }
-  .form::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
-  }
-  
-  .field{
-    width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
-    background:linear-gradient(180deg,var(--input-bg-1),var(--input-bg-2)); color:var(--text);
-    outline:none; transition:border-color .15s ease, box-shadow .15s ease;
-  }
-  .field::placeholder{ color:var(--muted) }
-  .field:focus{ border-color:var(--brand); box-shadow:0 0 0 3px rgba(59,221,130,.15) }
-  textarea.field{ resize:vertical; min-height:90px }
-
-  .lbl > span{ display:block; margin-bottom:6px; color:var(--text); font-weight:600 }
-  .lbl { margin-bottom: 0; }
-  .codes-editor{display:grid;gap:10px}
-
-  .code-edit-new{
-    display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
-    gap:10px; align-items:start; background:var(--panel-2); border:1px solid var(--line);
-    border-radius:12px; padding:12px; box-sizing:border-box;
-  }
-  .code-edit-new .row-wide { grid-column: 1 / -1; }
-  .code-edit-new .col-img{display:flex;align-items:center;gap:10px;justify-content:flex-end}
-
-  .preview-box{ margin-top:10px; display:none; }
-  .preview-box.show{ display:block; }
-  .preview-box .mini-thumb{
-    width:100%; aspect-ratio: 16 / 9; display:block; object-fit:cover;
-    border:1px solid var(--line); border-radius:12px; background:#000;
-  }
-
-  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:9999; padding:20px; }
-  .modal.open{ display:flex; }
-  .modal img{ max-width:min(90vw,1000px); max-height:80vh; object-fit:contain; border-radius:12px; border:1px solid var(--border); background:#000; box-shadow:0 10px 40px rgba(0,0,0,.6); }
-  .modal .close{ position:absolute; top:14px; right:18px; font-size:28px; line-height:1; color:var(--text); cursor:pointer; user-select:none; background:transparent; border:none; padding:6px 10px; }
-
-  .mini{font-size:13px;color:var(--text);font-weight:600;margin-bottom:6px;display:block}
-  .hr{height:1px;background:var(--line);margin:10px 0}
-  .flash{margin:10px auto;max-width:1100px;background:var(--panel-2);border:1px solid var(--line);padding:10px;border-radius:10px;text-align:center;color:var(--text)}
-
-  .actions-stack{
-    width:100%; margin:0 auto; display:flex; flex-direction:column; gap:10px;
-  }
-  .actions-stack .btn{ width:100%; }
-
-  /* Action buttons - Frontend style */
-  .btn-primary, .btn-danger {
-    width: 100%;
-    padding: 14px 20px;
-    border-radius: 12px;
-    border: 0;
-    font-weight: 700;
-    font-size: 16px;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(59,221,130,.4);
-    transition: transform .1s ease, box-shadow .2s ease;
-    color: #07140c;
-  }
-  .btn-primary {
-    background: linear-gradient(135deg, #2FD874, #12B767);
-    color: #fff;
-  }
-  .btn-primary:hover {
-    background: linear-gradient(135deg, #12B767, #0e9a52);
-    box-shadow: 0 6px 18px rgba(59,221,130,.55);
-  }
-  .btn-danger {
-    background: linear-gradient(135deg, #FF5A5F, #E23D3D);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(255,92,92,.4);
-  }
-  .btn-danger:hover {
-    background: linear-gradient(135deg, #E23D3D, #c73030);
-    box-shadow: 0 6px 18px rgba(255,92,92,.55);
-  }
-  .btn-primary:active, .btn-danger:active {
-    transform: translateY(1px);
-  }
-  /* Oculto por defecto */
-  .br-mobile { display: none; }
-
-  /* Solo en responsive (ajusta el breakpoint) */
-  @media (max-width: 768px) {
-    .br-mobile { display: inline; }
-  }
-
-  /* Theme Toggle Button */
-  .theme-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: var(--panel);
+  .theme-toggle-sidebar {
+    background: var(--input-bg-1);
     border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 48px;
-    height: 48px;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,.2);
-    z-index: 100;
+    flex-shrink: 0;
   }
-  .theme-toggle:hover {
+
+  .theme-toggle-sidebar:hover {
     transform: scale(1.1);
-    box-shadow: 0 6px 16px rgba(59,221,130,.3);
+    background: var(--panel-2);
   }
-  .theme-toggle svg {
-    width: 24px;
-    height: 24px;
+
+  .theme-toggle-sidebar svg {
+    width: 18px;
+    height: 18px;
     fill: var(--brand);
     transition: transform 0.3s ease;
   }
-  .theme-toggle:hover svg {
+
+  .theme-toggle-sidebar:hover svg {
     transform: rotate(20deg);
   }
 
+  .sidebar-nav {
+    flex: 1;
+    padding: 20px 0;
+    overflow-y: auto;
+  }
+
+  .nav-item {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    position: relative;
+  }
+
+  .nav-item:hover {
+    background: var(--panel-2);
+    color: var(--text);
+  }
+
+  .nav-item.active {
+    background: var(--panel-2);
+    color: var(--brand);
+    border-left-color: var(--brand);
+    font-weight: 600;
+  }
+
+  .nav-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .nav-badge {
+    margin-left: auto;
+    background: var(--danger);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* MAIN CONTENT */
+  .main-content {
+    margin-left: var(--sidebar-width);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .content-header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .content-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 1.8rem;
+    color: var(--text);
+  }
+
+  .content-header .subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  /* SECTIONS */
+  .section {
+    display: none;
+  }
+
+  .section.active {
+    display: block;
+  }
+
+  /* CARDS */
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    color: var(--text);
+  }
+
+  /* FORMS */
+  .field {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-size: 15px;
+  }
+
+  .field::placeholder {
+    color: var(--muted);
+  }
+
+  .field:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(59, 221, 130, .15);
+  }
+
+  textarea.field {
+    resize: vertical;
+    min-height: 90px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    background: var(--panel-2);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #2FD874, #12B767);
+    border: 0;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #12B767, #0e9a52);
+    box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #FF5A5F, #E23D3D);
+    border: 0;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+  }
+
+  .btn-danger:hover {
+    background: linear-gradient(135deg, #E23D3D, #c73030);
+    box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* COMMUNITIES LIST */
+  .communities-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .community-item {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .community-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .community-name {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--text);
+  }
+
+  .codes-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .code-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--input-bg-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .code-thumb {
+    width: 80px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #000;
+    cursor: zoom-in;
+    flex-shrink: 0;
+  }
+
+  .code-info {
+    flex: 1;
+  }
+
+  .code-value {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .code-note {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .code-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* FLASH MESSAGE */
+  .flash {
+    background: var(--panel-2);
+    border: 1px solid var(--brand);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .flash-icon {
+    width: 20px;
+    height: 20px;
+    fill: var(--brand);
+  }
+
+  /* SUGGESTIONS */
+  .suggestion-item {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .suggestion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .suggestion-photo {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 1px solid var(--line);
+  }
+
+  /* PINS LIST */
+  .pins-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pin-item {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .pin-info h3 {
+    margin: 0 0 4px 0;
+    color: var(--text);
+    font-size: 1.1rem;
+  }
+
+  .pin-info p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .pin-value {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--brand);
+    margin: 4px 0;
+  }
+
+  /* MODAL */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+  }
+
+  .modal.open {
+    display: flex;
+  }
+
+  .modal img {
+    max-width: min(90vw, 1000px);
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #000;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+  }
+
+  /* CODE EDITOR */
+  .codes-editor {
+    display: grid;
+    gap: 16px;
+  }
+
+  .code-edit-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .code-edit-row .full-width {
+    grid-column: 1 / -1;
+  }
+
+  .preview-box {
+    margin-top: 10px;
+    display: none;
+  }
+
+  .preview-box.show {
+    display: block;
+  }
+
+  .preview-thumb {
+    width: 100%;
+    max-width: 200px;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #000;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  /* RESPONSIVE */
+  .mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1001;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  /* Removed - consolidated below */
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  /* PAGE HEADER */
+  .page-header {
+    flex-shrink: 0;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .page-header-left {
+    flex: 1;
+  }
+
+  .page-header-right {
+    flex-shrink: 0;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 8px 0;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* Removed - consolidated below */
+
+  /* HOME SECTION LAYOUT */
+  .home-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+    gap: 20px;
+  }
+
+  /* SEARCH SECTION - STATIC */
+  .search-section {
+    flex-shrink: 0;
+  }
+
+  .search-bar-container {
+    display: flex;
+    gap: 12px;
+  }
+
+  .search-bar-container .field {
+    flex: 1;
+  }
+
+  /* COMMUNITIES CARD - SCROLLABLE BOX */
+  .home-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  .communities-scroll-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    min-height: 0;
+  }
+
+  .communities-scroll-wrapper::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .communities-scroll-wrapper::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 10px;
+  }
+
+  .communities-scroll-wrapper::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 10px;
+  }
+
+  .communities-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  .content-body {
+    flex: 1;
+    padding: 32px 32px 60px 32px;
+    overflow: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* EDIT MODAL */
+  .edit-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .edit-modal.open {
+    display: flex;
+  }
+
+  .edit-modal-content {
+    width: min(90vw, 800px);
+    max-height: 90vh;
+    background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+    border: 1px solid var(--modal-border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .edit-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .edit-modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text);
+  }
+
+  .edit-modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .edit-modal-footer {
+    padding: 20px 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+
+  .modal-codes-scroll-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    margin-bottom: 12px;
+  }
+
+  .edit-code-item {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .edit-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .edit-code-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .edit-code-full {
+    grid-column: 1 / -1;
+  }
+
+  /* RESPONSIVE DESIGN */
   @media (max-width: 768px) {
-    .theme-toggle {
-      width: 44px;
-      height: 44px;
-      top: 15px;
-      right: 15px;
+    .sidebar {
+      transform: translateX(-100%);
     }
-    .theme-toggle svg {
-      width: 20px;
-      height: 20px;
+
+    .sidebar.open {
+      transform: translateX(0);
     }
+
+    .main-content {
+      margin-left: 0;
+    }
+
+    .mobile-menu-toggle {
+      display: flex;
+    }
+
+    .content-header {
+      padding: 20px 20px 20px 70px;
+    }
+
+    .content-body {
+      padding: 20px;
+    }
+
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .home-container {
+      gap: 16px;
+    }
+
+    .search-bar-container {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-bar-container .btn {
+      width: 100%;
+    }
+
+    .code-edit-row {
+      grid-template-columns: 1fr;
+    }
+
+    .edit-code-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr !important;
+    }
+
+    #home-section {
+      height: calc(100vh - 200px);
+    }
+  }
+
+  /* FILE UPLOAD LABEL */
+  .file-upload-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .file-upload-label:hover {
+    background: var(--panel-2);
+  }
+
+  input[type="file"]:not(.field) {
+    display: none;
+  }
+
+  .edit-file-input {
+    display: block !important;
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--input-bg-1);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .edit-file-input::file-selector-button {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    margin-right: 10px;
+    transition: background 0.2s ease;
+  }
+
+  .edit-file-input::file-selector-button:hover {
+    background: var(--panel-2);
+  }
+
+  .upload-status {
+    margin-top: 8px;
+    font-size: 0.85rem;
+  }
+
+  /* ALERT MODAL */
+  .alert-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+  }
+
+  .alert-modal.open {
+    display: flex;
+  }
+
+  .alert-modal-content {
+    width: min(90vw, 500px);
+    background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+    border: 1px solid var(--modal-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  }
+
+  .alert-modal-icon {
+    padding: 24px 24px 0 24px;
+    text-align: center;
+  }
+
+  .alert-icon-svg {
+    width: 48px;
+    height: 48px;
+    color: var(--brand);
+  }
+
+  .alert-modal-body {
+    padding: 16px 24px 24px 24px;
+    text-align: center;
+  }
+
+  .alert-modal-title {
+    margin: 0 0 8px 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .alert-modal-message {
+    margin: 0;
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 0.95rem;
+  }
+
+  .alert-modal-footer {
+    padding: 16px 24px 24px 24px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .alert-modal-footer .btn {
+    min-width: 120px;
   }
 </style>
 </head>
 <body>
-  <!-- Theme Toggle Button -->
-  <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
-    <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-    <svg id="sunIcon" style="display:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="5"/>
-      <path d="M12 1L13 5L11 5Z"/>
-      <path d="M12 23L13 19L11 19Z"/>
-      <path d="M23 12L19 13L19 11Z"/>
-      <path d="M1 12L5 13L5 11Z"/>
-      <path d="M19.07 4.93L16 7.5L15 6.5Z"/>
-      <path d="M4.93 19.07L8 16.5L9 17.5Z"/>
-      <path d="M19.07 19.07L16.5 16L17.5 15Z"/>
-      <path d="M4.93 4.93L7.5 8L6.5 9Z"/>
-    </svg>
-  </button>
 
-<header>
-  <a href="?key=<?=urlencode(ADMIN_KEY)?>" class="title">Gate Codes</a>
-  <div class="sub">Admin Dashboard · Edit <code>gates.json</code></div>
-  <?php if($msg): ?><div class="flash"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
-</header>
+<?php
+// Calculate suggestion count for badge
+$suggest_count = count($suggestions);
+require_once __DIR__ . '/includes/sidebar.php';
+?>
 
-<!-- JSON Upload/Download Actions -->
-<div class="json-actions">
-  <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>&download_json=1" download>
-    📥 Download JSON
-  </a>
-  
-  <form class="upload-json-form" method="post" enctype="multipart/form-data" id="uploadJsonForm">
-    <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-    <input type="hidden" name="action" value="upload_json">
-    <input type="file" name="json_file" id="jsonFileInput" accept=".json,application/json" required>
-    <label for="jsonFileInput" class="btn" style="cursor:pointer;margin:0;">
-      📤 Upload JSON
-    </label>
-  </form>
-</div>
+<!-- MAIN CONTENT -->
+<main class="main-content">
+  <div class="content-body">
+    <?php if($msg): ?>
+      <div class="flash" style="display: none;" id="flashMessage" data-message="<?= htmlspecialchars($msg) ?>"></div>
+    <?php endif; ?>
 
-<div class="wrap<?= $edit ? ' edit-mode' : '' ?>">
-  <!-- LIST / EDIT  (Communities) -->
-  <section class="card">
-    <div class="card-header">
-      <h2><?= $edit ? 'Edit community' : 'Communities' ?></h2>
-      
-      <?php if(!$edit): ?>
-        <!-- Search form inline -->
-        <form class="search-inline" method="get">
-          <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-          <input class="field" type="text" name="q" value="<?=htmlspecialchars($q)?>" placeholder="Search by community or code">
-          <button class="btn" type="submit">Search</button>
-        </form>
-      <?php endif; ?>
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1 class="page-title">Communities</h1>
+        <p class="page-subtitle">Manage your community gate codes</p>
+      </div>
+      <div class="page-header-right">
+        <button class="btn btn-primary" id="openAddNewModal">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="margin-right: 6px;">
+            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+          </svg>
+          Add New
+        </button>
+      </div>
     </div>
 
-    <?php if($edit):
-      $i = find_comm_index($data,$edit);
-      if($i<0): ?>
-        <p class="muted">Community not found.</p>
-      <?php else:
-        $c = $data[$i]; ?>
-        <form class="form" method="post" id="editForm">
-          <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-          <input type="hidden" name="original" value="<?=htmlspecialchars($c['community'])?>">
-          <input type="hidden" name="action" id="editAction" value="update">
+    <!-- HOME SECTION -->
+    <div class="home-container">
+      <!-- SEARCH BAR - STATIC -->
+      <div class="search-section">
+        <div class="search-bar-container">
+          <input type="text" class="field" id="searchInput" placeholder="Search by community or code..." value="<?= htmlspecialchars($q) ?>">
+          <button class="btn btn-primary" id="searchBtn">Search</button>
+        </div>
+      </div>
 
-          <label class="lbl"><span>Community</span>
-            <input class="field" name="community" value="<?=htmlspecialchars($c['community'])?>" required>
-          </label>
-
-          <label class="lbl"><span>Codes (add/remove as needed)</span>
-            <div class="codes-scroll-container">
-              <div id="codesEditor" class="codes-editor">
-            <?php foreach(($c['codes']??[]) as $idx=>$row):
-              $photo = web_photo($row['photo'] ?? '');
-            ?>
-              <div class="code-edit-new">
-                <input class="field" name="codes[<?= $idx ?>][code]" placeholder="e.g., #54839*"
-                       value="<?=htmlspecialchars($row['code']??'')?>"
-                       required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
-                       title="Up to 8 characters: letters, numbers, # or *">
-
-                <input class="field" name="codes[<?= $idx ?>][notes]"
-                       placeholder="Entrance type"
-                       value="<?=htmlspecialchars($row['notes']??'')?>">
-
-                <div class="col-img">
-                  <!-- Botón JS para borrar este code -->
-                  <button class="btn danger js-del-code" type="button"
-                          data-code="<?=htmlspecialchars($row['code']??'')?>"
-                          data-community="<?=htmlspecialchars($c['community'])?>">
-                    Delete Code
-                  </button>
-                </div>
-
-                <textarea class="field row-wide" name="codes[<?= $idx ?>][details]" placeholder="Details"><?=htmlspecialchars($row['details']??'')?></textarea>
-
-                <div class="row-wide">
-                  <label class="lbl"><span>Location photo (JPG/PNG/WebP/HEIC)</span>
-                    <input class="field file-row" type="file" accept="image/*">
-                  </label>
-                  <div class="preview-box show">
-                    <img class="mini-thumb" src="<?= htmlspecialchars($photo) ?>" alt="preview">
-                    <input type="hidden" name="codes[<?= $idx ?>][photo]" value="<?=htmlspecialchars($photo)?>">
-                  </div>
-                  <div class="mini up-note"></div>
-                </div>
-              </div>
-            <?php endforeach; ?>
-              </div>
-            </div>
-
-            <div><button class="btn" type="button" onclick="addRowEdit()">+ Add code</button></div>
-          </label>
-          <div class="hr"></div>
-
-          <div class="actions-stack">
-            <button class="btn-primary" type="submit" id="btnSave">Save Changes</button>
-            <button class="btn-danger" type="submit" id="btnDelete">Delete Community</button>
-          </div>
-        </form>
-      <?php endif; ?>
-
-    <?php else: ?>
-      <div class="communities-scroll">
-        <div class="grid">
+      <!-- COMMUNITIES CARD - SCROLLABLE -->
+      <div class="card home-card">
+        <div class="communities-scroll-wrapper">
+          <div class="communities-grid" id="communitiesList">
           <?php if(empty($filtered)): ?>
-            <p class="muted">No communities found.</p>
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <p>No communities found.</p>
+            </div>
           <?php else: foreach($filtered as $row): ?>
-            <div class="comm">
-              <div class="comm-head">
-                <div class="comm-name"><?= htmlspecialchars($row['community']) ?></div>
-                <div class="comm-actions">
-                  <a class="btn" href="?key=<?=urlencode(ADMIN_KEY)?>&edit=<?=urlencode($row['community'])?>">Modify</a>
+            <div class="community-item">
+              <div class="community-header">
+                <div class="community-name">
+                  <?= htmlspecialchars($row['community']) ?>
+                  <?php if (!empty($row['city'])): ?>
+                    <span style="color: var(--muted); font-weight: 500;"> - <?= htmlspecialchars($row['city']) ?></span>
+                  <?php endif; ?>
+                </div>
+                <div class="btn-group">
+                  <button class="btn btn-edit-comm" data-community="<?= htmlspecialchars($row['community']) ?>">Edit</button>
+                  <button class="btn btn-danger btn-delete-comm" data-community="<?= htmlspecialchars($row['community']) ?>">Delete</button>
                 </div>
               </div>
-              <div class="codes">
+              <div class="codes-list">
                 <?php foreach(($row['codes']??[]) as $code):
                   $p = web_photo($code['photo'] ?? '');
-                  ?>
-                  <div class="code-row">
-                    <img class="thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
-                    <div class="c-left">
-                      <div class="code">
-                        <span><?= htmlspecialchars($code['code'] ?? '') ?></span>
-                        <?php if(isset($code['report_count']) && $code['report_count'] > 0): ?>
-                          <span class="report-badge" title="<?= $code['report_count'] ?> report<?= $code['report_count'] > 1 ? 's' : '' ?>"><?= $code['report_count'] ?></span>
-                        <?php endif; ?>
-                      </div>
-                      <?php if(!empty($code['notes'])): ?><div class="note"><?= htmlspecialchars($code['notes']) ?></div><?php endif; ?>
-                      <?php if(!empty($code['details'])): ?><div class="note"><?= htmlspecialchars($code['details']) ?></div><?php endif; ?>
+                ?>
+                  <div class="code-item">
+                    <img class="code-thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
+                    <div class="code-info">
+                      <div class="code-value"><?= htmlspecialchars($code['code'] ?? '') ?></div>
+                      <?php if(!empty($code['notes'])): ?>
+                        <div class="code-note"><?= htmlspecialchars($code['notes']) ?></div>
+                      <?php endif; ?>
+                      <?php if(!empty($code['details'])): ?>
+                        <div class="code-note"><?= htmlspecialchars($code['details']) ?></div>
+                      <?php endif; ?>
                     </div>
                   </div>
                 <?php endforeach; ?>
               </div>
             </div>
           <?php endforeach; endif; ?>
+          </div>
         </div>
       </div>
-    <?php endif; ?>
-  </section>
-
-  <!-- ADD NEW -->
-  <section class="card add-community-card">
-    <div class="card-header">
-      <h2>Add community</h2>
     </div>
 
-    <form class="form" method="post" id="addForm">
-      <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-      <input type="hidden" name="action" value="add">
-      <label class="lbl"><span>Community Name</span>
-        <input class="field" name="community" placeholder="e.g., Water Oaks" required>
-      </label>
+    <!-- ADD NEW SECTION -->
+    <section id="add-new-section" class="section" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Add New Community</h2>
 
-      <label class="lbl"><span>Add Codes (add as many as you need)</span>
-        <div class="codes-scroll-container">
-          <div id="codesNew" class="codes-editor"></div>
+        <form method="post" id="addForm">
+          <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+          <input type="hidden" name="action" value="add">
+
+          <div class="form-group">
+            <label class="form-label">Community Name</label>
+            <input type="text" class="field" name="community" placeholder="e.g., Water Oaks" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Codes</label>
+            <div class="codes-editor" id="codesEditor"></div>
+            <button type="button" class="btn" id="addCodeBtn" style="margin-top: 12px;">+ Add Code</button>
+          </div>
+
+          <div class="btn-group">
+            <button type="button" class="btn btn-primary" id="submitAddForm">Add Community</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- CONTRIBUTIONS SECTION -->
+    <section id="contributions-section" class="section" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">User Contributions</h2>
+
+        <?php if(empty($suggestions)): ?>
+          <div class="empty-state">
+            <div class="empty-state-icon">✨</div>
+            <p>No contributions yet.</p>
+          </div>
+        <?php else: foreach($suggestions as $idx => $suggestion): ?>
+          <div class="suggestion-item">
+            <div class="suggestion-header">
+              <div>
+                <h3 style="margin: 0 0 8px 0; color: var(--text);"><?= htmlspecialchars($suggestion['community'] ?? '') ?></h3>
+                <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Code: <strong><?= htmlspecialchars($suggestion['code'] ?? '') ?></strong></p>
+                <?php if(!empty($suggestion['notes'])): ?>
+                  <p style="margin: 4px 0 0 0; color: var(--muted); font-size: 0.85rem;"><?= htmlspecialchars($suggestion['notes']) ?></p>
+                <?php endif; ?>
+              </div>
+              <div class="btn-group">
+                <form method="post" style="display: inline;">
+                  <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+                  <input type="hidden" name="action" value="approve_contribution">
+                  <input type="hidden" name="index" value="<?= $idx ?>">
+                  <button type="submit" class="btn btn-primary">Approve</button>
+                </form>
+                <form method="post" style="display: inline;">
+                  <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+                  <input type="hidden" name="action" value="delete_contribution">
+                  <input type="hidden" name="index" value="<?= $idx ?>">
+                  <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+              </div>
+            </div>
+
+            <?php if(!empty($suggestion['photo'])):
+              $photo_url = $suggestion['photo'];
+              if(strpos($photo_url, 'temp_assets/') !== false) {
+                $photo_url = TEMP_ASSETS_URL . basename($photo_url);
+              } else {
+                $photo_url = web_photo($photo_url);
+              }
+            ?>
+              <img class="suggestion-photo js-open-modal" src="<?= htmlspecialchars($photo_url) ?>" alt="Photo" data-full="<?= htmlspecialchars($photo_url) ?>">
+            <?php endif; ?>
+
+            <?php if(!empty($suggestion['details'])): ?>
+              <p style="margin: 12px 0 0 0; color: var(--text);"><?= htmlspecialchars($suggestion['details']) ?></p>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; endif; ?>
+      </div>
+    </section>
+
+    <!-- BACKUP SECTION -->
+    <section id="backup-section" class="section" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">Download Backup</h2>
+        <p style="color: var(--muted); margin-bottom: 16px;">Download a backup copy of your gates.json file.</p>
+        <a href="?key=<?= urlencode(ADMIN_KEY) ?>&action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Upload JSON</h2>
+        <p style="color: var(--muted); margin-bottom: 16px;">Upload a gates.json file to replace the current data. A backup will be created automatically.</p>
+
+        <form method="post" enctype="multipart/form-data" id="uploadJsonForm">
+          <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+          <input type="hidden" name="action" value="upload_json">
+          <input type="file" name="json_file" id="jsonFileInput" accept=".json,application/json" required>
+          <label for="jsonFileInput" class="file-upload-label">📤 Choose JSON File</label>
+        </form>
+      </div>
+    </section>
+
+    <!-- SETTINGS SECTION -->
+    <section id="settings-section" class="section" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">PIN Management</h2>
+
+        <div class="pins-grid">
+          <?php if(empty($pins)): ?>
+            <div class="empty-state">
+              <div class="empty-state-icon">🔐</div>
+              <p>No PINs configured.</p>
+            </div>
+          <?php else: foreach($pins as $idx => $pin): ?>
+            <div class="pin-item">
+              <div class="pin-info">
+                <h3><?= htmlspecialchars($pin['name'] ?? '') ?></h3>
+                <div class="pin-value"><?= htmlspecialchars($pin['pin'] ?? '') ?></div>
+                <p>Created: <?= htmlspecialchars($pin['date'] ?? '') ?></p>
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-edit-pin" data-index="<?= $idx ?>" data-name="<?= htmlspecialchars($pin['name'] ?? '') ?>" data-pin="<?= htmlspecialchars($pin['pin'] ?? '') ?>">Edit</button>
+                <form method="post" style="display: inline;">
+                  <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+                  <input type="hidden" name="action" value="delete_pin">
+                  <input type="hidden" name="index" value="<?= $idx ?>">
+                  <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this PIN?')">Delete</button>
+                </form>
+              </div>
+            </div>
+          <?php endforeach; endif; ?>
         </div>
-        <div><button class="btn" type="button" id="btnAddRow">+ Add code</button></div>
-      </label>
 
-      <button class="btn primary" id="btnAddCommunity" type="button">Add New Entry</button>
-    </form>
-  </section>
-  <br class="br-mobile" />
-</div>
+        <button class="btn btn-primary" id="addPinBtn" style="margin-top: 20px;">+ Add New PIN</button>
+      </div>
 
-<!-- ===== Image Modal ===== -->
+      <!-- ADD/EDIT PIN FORM (Hidden by default) -->
+      <div class="card" id="pinFormCard" style="display: none;">
+        <h2 class="card-title" id="pinFormTitle">Add New PIN</h2>
+
+        <form method="post" id="pinForm">
+          <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+          <input type="hidden" name="action" value="add_pin" id="pinFormAction">
+          <input type="hidden" name="index" value="" id="pinFormIndex">
+
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" class="field" name="pin_name" id="pinName" placeholder="e.g., John Doe" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">PIN</label>
+            <input type="text" class="field" name="pin_value" id="pinValue" placeholder="e.g., 1234" required>
+          </div>
+
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary">Save PIN</button>
+            <button type="button" class="btn" id="cancelPinBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- IMAGE MODAL -->
 <div id="imgModal" class="modal" aria-hidden="true">
-  <button class="close" type="button" aria-label="Close">&times;</button>
+  <button class="modal-close" type="button" aria-label="Close">&times;</button>
   <img id="imgModalPic" src="" alt="photo">
 </div>
 
-<footer>
-  <div class="footer-content">
-    <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a></span>
+<!-- ALERT MODAL -->
+<div id="alertModal" class="alert-modal">
+  <div class="alert-modal-content">
+    <div class="alert-modal-icon" id="alertModalIcon">
+      <svg class="alert-icon-svg" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <div class="alert-modal-body">
+      <h3 class="alert-modal-title" id="alertModalTitle">Notification</h3>
+      <p class="alert-modal-message" id="alertModalMessage"></p>
+    </div>
+    <div class="alert-modal-footer">
+      <button class="btn btn-primary" id="alertModalOk">OK</button>
+    </div>
   </div>
-</footer>
-<script>
-const DEFAULT_THUMB_URL = "<?=htmlspecialchars(DEFAULT_THUMB_URL)?>";
+</div>
 
-/* Handle JSON file upload */
-document.getElementById('jsonFileInput')?.addEventListener('change', function(e) {
-  if (this.files.length > 0) {
-    const fileName = this.files[0].name;
-    if (!fileName.endsWith('.json')) {
-      alert('Please select a valid JSON file.');
-      this.value = '';
-      return;
-    }
-    
-    if (confirm(`Upload "${fileName}" and replace current gates.json?\n\nA backup will be created automatically.`)) {
-      document.getElementById('uploadJsonForm').submit();
-    } else {
-      this.value = '';
-    }
-  }
-});
+<!-- EDIT COMMUNITY MODAL -->
+<div id="editModal" class="edit-modal">
+  <div class="edit-modal-content">
+    <div class="edit-modal-header">
+      <h2 id="editModalTitle">Edit Community</h2>
+      <button class="btn" id="closeEditModal" type="button">✕</button>
+    </div>
+    <div class="edit-modal-body" id="editModalBody">
+      <form id="editCommunityForm" method="post">
+        <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="original" id="editOriginalName" value="">
 
-/* Utilidad para crear HTML */
-function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; }
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Community Name</label>
+            <input type="text" class="field" name="community" id="editCommunityName" required>
+          </div>
 
-/* Plantilla de fila NUEVA */
-function rowTemplate(prefix, idx){
-  return `
-  <div class="code-edit-new" data-row="${idx}">
-    <input class="field" name="${prefix}[${idx}][code]" placeholder="e.g., #54839*"
-           required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}"
-           title="Up to 8 characters: letters, numbers, # or *">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">City Name</label>
+            <input type="text" class="field" name="city" id="editCityName" placeholder="e.g., Orlando">
+          </div>
+        </div>
 
-    <input class="field" name="${prefix}[${idx}][notes]"
-           placeholder="Entrance type">
-
-    <textarea class="field row-wide" name="${prefix}[${idx}][details]" placeholder="Details"></textarea>
-
-    <div class="row-wide">
-      <label class="lbl"><span>Location photo (JPG/PNG/WebP/HEIC)</span>
-        <input class="field file-row" type="file" accept="image/*">
-      </label>
-      <div class="preview-box">
-        <img class="mini-thumb" src="" alt="preview">
-        <input type="hidden" name="${prefix}[${idx}][photo]" value="">
+        <div class="form-group">
+          <label class="form-label">Codes</label>
+          <div id="editCodesContainer"></div>
+        </div>
+      </form>
+    </div>
+    <div class="edit-modal-footer">
+      <button type="button" class="btn" id="addEditCodeBtn">+ Add Code</button>
+      <div style="margin-left: auto; display: flex; gap: 12px;">
+        <button class="btn" id="cancelEditModal">Cancel</button>
+        <button class="btn btn-primary" id="saveEditModal">Save Changes</button>
       </div>
-      <div class="mini up-note"></div>
     </div>
+  </div>
+</div>
 
-    <div class="row-wide">
-      <button class="btn danger btn-remove-code" type="button" style="width:100%;">Remove</button>
+<!-- ADD NEW COMMUNITY MODAL -->
+<div id="addNewModal" class="edit-modal">
+  <div class="edit-modal-content">
+    <div class="edit-modal-header">
+      <h2>Add New Community</h2>
+      <button class="btn" id="closeAddNewModal" type="button">✕</button>
     </div>
-  </div>`;
-}
+    <div class="edit-modal-body">
+      <form id="addNewForm" method="post">
+        <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+        <input type="hidden" name="action" value="add">
 
-/* Actualizar visibilidad de botones Remove */
-function updateRemoveButtons(container) {
-  if (!container) return;
-  const removeButtons = container.querySelectorAll('.btn-remove-code');
-  
-  // Si solo hay 1 fila con botón remove (nueva), ocultar el botón Remove
-  if (removeButtons.length === 1) {
-    removeButtons.forEach(btn => btn.style.display = 'none');
-  } else if (removeButtons.length > 1) {
-    // Si hay más de 1 fila nueva, mostrar todos los botones Remove
-    removeButtons.forEach(btn => btn.style.display = 'block');
-  }
-}
+        <!-- STATIC HEADER -->
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Community Name</label>
+            <input type="text" class="field" name="community" id="addNewCommunityName" placeholder="e.g., Water Oaks" required>
+          </div>
 
-/* Guardar archivo seleccionado por fila para subirlo justo antes del submit */
-const rowFiles = new WeakMap();
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">City Name</label>
+            <input type="text" class="field" name="city" id="addNewCityName" placeholder="e.g., Orlando">
+          </div>
+        </div>
 
-function wireRow(row){
-  const file = row.querySelector('.file-row');
-  const note = row.querySelector('.up-note');
-  const pbox = row.querySelector('.preview-box');
-  const img  = row.querySelector('.preview-box .mini-thumb');
-  if(!file) return;
+        <div class="form-group">
+          <label class="form-label">Codes</label>
+        </div>
 
-  file.addEventListener('change', (e)=>{
-    const f = e.target.files[0];
-    if(!f){
-      rowFiles.delete(row);
-      if (note) note.textContent = '';
-      if (pbox) pbox.classList.remove('show');
-      if (img)  img.src = '';
-      return;
-    }
-    rowFiles.set(row, f);
-    if (pbox) pbox.classList.add('show');
-    if (img)  img.src = URL.createObjectURL(f);
-    if (note) note.textContent = 'Ready to upload on submit.';
-  });
-}
+        <!-- SCROLLABLE CODES AREA -->
+        <div class="modal-codes-scroll-wrapper">
+          <div id="addNewCodesContainer"></div>
+        </div>
+      </form>
+    </div>
+    <div class="edit-modal-footer">
+      <button type="button" class="btn" id="addNewCodeBtn">+ Add Code</button>
+      <div style="margin-left: auto; display: flex; gap: 12px;">
+        <button class="btn" id="cancelAddNewModal">Cancel</button>
+        <button class="btn btn-primary" id="saveAddNewModal">Add Community</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-function attachPhotoToRow(row, url){
-  const hidden = row.querySelector('.preview-box input[type="hidden"]');
-  const img    = row.querySelector('.preview-box .mini-thumb');
-  const pbox   = row.querySelector('.preview-box');
-  if (hidden) hidden.value = url || '';
-  if (img && url) img.src = url;
-  if (pbox) pbox.classList.add('show');
-}
+<script>
+// INDEX.PHP SPECIFIC SCRIPTS
 
-  /* Subir en lote lo pendiente dentro de un contenedor (Add o Edit) */
-async function uploadQueuedRows(container){
-  if (!container) return;
-  const rows = container.querySelectorAll('.code-edit-new');
-  const uploads = [];
-  rows.forEach((row)=>{
-    const f = rowFiles.get(row);
-    if (!f) return;
-    const note = row.querySelector('.up-note');
-    if (note) note.textContent = 'Uploading photo...';
-
-    const fd = new FormData();
-    fd.append('key','<?=htmlspecialchars(ADMIN_KEY)?>');
-    fd.append('photo', f);
-
-    const p = fetch('?ajax=upload&key=<?=htmlspecialchars(ADMIN_KEY)?>', { method:'POST', body: fd })
-      .then(async r=>{
-        const text = await r.text();
-        let data;
-        try { data = JSON.parse(text); } catch { data = {status:'fail', error: 'bad_json', raw:text}; }
-
-        if (!r.ok) {
-          if (note) note.textContent = `HTTP ${r.status}${data.error ? ` · ${data.error}` : ''}`;
-          return;
-        }
-
-        if (data.status==='ok' && data.url) {
-          attachPhotoToRow(row, data.url);
-          rowFiles.delete(row);
-          if (note) note.textContent = 'Photo uploaded.';
-        } else {
-          const msg = data.error || 'Upload failed';
-          if (note) note.textContent = msg;
-        }
-      })
-      .catch(()=> { if (note) note.textContent='Network error.'; });
-
-    uploads.push(p);
-  });
-  if (uploads.length) await Promise.all(uploads);
-
-  // Asegurar que todas las filas tengan una foto (por defecto o subida)
-  rows.forEach((row)=>{
-    const hidden = row.querySelector('.preview-box input[type="hidden"]');
-    const img = row.querySelector('.preview-box .mini-thumb');
-    const pbox = row.querySelector('.preview-box');
-    
-    // Si no tiene foto asignada, usar la imagen por defecto
-    if (hidden && !hidden.value) {
-      hidden.value = DEFAULT_THUMB_URL;
-      if (img) img.src = DEFAULT_THUMB_URL;
-      if (pbox) pbox.classList.add('show');
-    }
-  });
-}
-
-/* Crear filas en "Add" */
-let idxNew  = 0;
-const codesNewBox = document.getElementById('codesNew');
-function addRowNew(){
-  const row = el(rowTemplate('codes', idxNew++));
-  codesNewBox.appendChild(row);
-  wireRow(row);
-  
-  // Agregar event listener al botón Remove
-  const removeBtn = row.querySelector('.btn-remove-code');
-  if (removeBtn) {
-    removeBtn.addEventListener('click', function() {
-      this.closest('.code-edit-new').remove();
-      updateRemoveButtons(codesNewBox);
-    });
-  }
-  
-  updateRemoveButtons(codesNewBox);
-}
-if (codesNewBox){ addRowNew(); }
-const addRowBtn = document.getElementById('btnAddRow');
-if (addRowBtn) addRowBtn.addEventListener('click', ()=> addRowNew());
-
-/* Edit: añadir nuevas filas (client-side) */
-function addRowEdit(){
-  const box = document.getElementById('codesEditor');
-  if (!box) return;
-  const next = box.querySelectorAll('.code-edit-new').length;
-  const row = el(rowTemplate('codes', next));
-  box.appendChild(row);
-  wireRow(row);
-  
-  // Agregar event listener al botón Remove
-  const removeBtn = row.querySelector('.btn-remove-code');
-  if (removeBtn) {
-    removeBtn.addEventListener('click', function() {
-      this.closest('.code-edit-new').remove();
-      updateRemoveButtons(box);
-    });
-  }
-  
-  updateRemoveButtons(box);
-}
-/* Wire inicial para filas existentes */
-document.querySelectorAll('#codesEditor .code-edit-new').forEach(wireRow);
-
-/* Actualizar botones Remove en la carga inicial (Edit mode) */
-const codesEditorBox = document.getElementById('codesEditor');
-if (codesEditorBox) {
-  updateRemoveButtons(codesEditorBox);
-}
-
-/* Submit "Add New Entry" - FIXED */
-const addBtn = document.getElementById('btnAddCommunity');
-if (addBtn){
-  addBtn.addEventListener('click', async ()=>{
-    const codeInputs = document.querySelectorAll('#codesNew input[name*="[code]"]');
-    
-    // Verificar que haya al menos una fila
-    if (codeInputs.length === 0) {
-      alert('Add at least one code.');
-      return;
-    }
-    
-    // Validar que al menos UN código esté completo
-    let hasValidCode = false;
-    for (const inp of codeInputs) {
-      const v = inp.value.trim();
-      if (v.length > 0) {
-        if (v.length > 8) {
-          alert('Code must be 8 characters or less.');
-          inp.focus();
-          return;
-        }
-        hasValidCode = true;
-      }
-    }
-    
-    if (!hasValidCode) {
-      alert('Add at least one code.');
-      codeInputs[0]?.focus();
-      return;
-    }
-    
-    await uploadQueuedRows(document.getElementById('codesNew'));
-    HTMLFormElement.prototype.submit.call(document.getElementById('addForm'));
-  });
-}
-
-/* Delete Community / Save changes control */
-const editForm = document.getElementById('editForm');
-if (editForm){
-  const editAction = document.getElementById('editAction');
-  const btnSave = document.getElementById('btnSave');
-  const btnDelete = document.getElementById('btnDelete');
-
-  if (btnSave){
-    btnSave.addEventListener('click', ()=>{ editAction.value = 'update'; });
-  }
-  if (btnDelete){
-    btnDelete.addEventListener('click', (ev)=>{
-      editAction.value = 'delete_comm';
-      if (!confirm('Are you sure you want to delete this community?')){
-        ev.preventDefault();
-        editAction.value = 'update';
-      }
-    });
-  }
-
-  let editSubmitting = false;
-  editForm.addEventListener('submit', async (e)=>{
-    if (editSubmitting) return;
-    e.preventDefault();
-    if (editAction.value !== 'delete_comm'){
-      await uploadQueuedRows(document.getElementById('codesEditor'));
-    }
-    editSubmitting = true;
-    HTMLFormElement.prototype.submit.call(editForm);
-  });
-}
-
-/* Botón "Delete code": crea y envía un form propio */
-document.addEventListener('click', (e)=>{
-  const t = e.target;
-  if (t && t.classList && t.classList.contains('js-del-code')){
-    const code = t.getAttribute('data-code') || '';
-    const comm = t.getAttribute('data-community') || (document.querySelector('#editForm input[name="community"]')?.value || '');
-    if (!code || !comm) return;
-    if (!confirm('Delete this code?')) return;
-
-    const f = document.createElement('form');
-    f.method = 'post';
-    f.innerHTML = `
-      <input type="hidden" name="key" value="<?=htmlspecialchars(ADMIN_KEY)?>">
-      <input type="hidden" name="action" value="delete_code">
-      <input type="hidden" name="community" value="${comm.replace(/"/g,'&quot;')}">
-      <input type="hidden" name="code" value="${code.replace(/"/g,'&quot;')}">
-    `;
-    document.body.appendChild(f);
-    f.submit();
-  }
-});
-
-/* Modal de imagen */
+// IMAGE MODAL
 const modal = document.getElementById('imgModal');
 const modalImg = document.getElementById('imgModalPic');
-const modalClose = modal ? modal.querySelector('.close') : null;
+const modalClose = modal.querySelector('.modal-close');
 
-function openModal(src){
-  if (!modal) return;
-  modalImg.src = src || '<?=htmlspecialchars(DEFAULT_THUMB_URL)?>';
+function openModal(src) {
+  modalImg.src = src;
   modal.classList.add('open');
-  modal.setAttribute('aria-hidden','false');
+  modal.setAttribute('aria-hidden', 'false');
 }
-function closeModal(){
-  if (!modal) return;
+
+function closeModal() {
   modal.classList.remove('open');
-  modal.setAttribute('aria-hidden','true');
+  modal.setAttribute('aria-hidden', 'true');
   modalImg.src = '';
 }
-document.addEventListener('click', (e)=>{
-  const t = e.target;
-  if (t.classList && t.classList.contains('js-open-modal')) {
-    const full = t.getAttribute('data-full') || t.src;
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('js-open-modal')) {
+    const full = e.target.getAttribute('data-full') || e.target.src;
     openModal(full);
   }
-  if (t === modal || t === modalClose) {
+  if (e.target === modal || e.target === modalClose) {
     closeModal();
   }
 });
-document.addEventListener('keydown', (e)=>{
-  if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
 });
 
-// Theme Toggle Functionality
-const themeToggle = document.getElementById('themeToggle');
-const moonIcon = document.getElementById('moonIcon');
-const sunIcon = document.getElementById('sunIcon');
-const htmlElement = document.documentElement;
+// SEARCH
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
 
-// Load theme from localStorage or default to dark
-const savedTheme = localStorage.getItem('theme') || 'dark';
-if (savedTheme === 'light') {
-  htmlElement.setAttribute('data-theme', 'light');
-  moonIcon.style.display = 'block';
-  sunIcon.style.display = 'none';
-} else {
-  moonIcon.style.display = 'none';
-  sunIcon.style.display = 'block';
+searchBtn.addEventListener('click', () => {
+  const query = searchInput.value.trim();
+  window.location.href = `?key=${ADMIN_KEY}&section=home&q=${encodeURIComponent(query)}`;
+});
+
+searchInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    searchBtn.click();
+  }
+});
+
+// ADD CODE ROWS (for Add New section)
+let codeIndex = 0;
+
+function createCodeRow(index) {
+  const div = document.createElement('div');
+  div.className = 'code-edit-row';
+  div.innerHTML = `
+    <div class="form-group">
+      <label class="form-label">Code</label>
+      <input type="text" class="field" name="codes[${index}][code]" placeholder="e.g., #54839*" required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <input type="text" class="field" name="codes[${index}][notes]" placeholder="e.g., Main entrance">
+    </div>
+    <div class="form-group full-width">
+      <label class="form-label">Details</label>
+      <textarea class="field" name="codes[${index}][details]" placeholder="Additional details"></textarea>
+    </div>
+    <div class="form-group full-width">
+      <label class="form-label">Photo (JPG/PNG/WebP/HEIC)</label>
+      <input type="file" class="edit-file-input" accept="image/*" id="file-${index}">
+      <div class="preview-box" id="preview-${index}">
+        <img class="preview-thumb" src="" alt="preview">
+      </div>
+      <input type="hidden" name="codes[${index}][photo]" id="photo-${index}" value="">
+      <div class="upload-status" id="status-${index}" style="margin-top: 8px; font-size: 0.85rem; color: var(--muted);"></div>
+    </div>
+    <div class="full-width">
+      <button type="button" class="btn btn-danger btn-remove-code">Remove Code</button>
+    </div>
+  `;
+  return div;
 }
 
-// Toggle theme
-themeToggle.addEventListener('click', () => {
-  const currentTheme = htmlElement.getAttribute('data-theme');
-  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+document.getElementById('addCodeBtn').addEventListener('click', () => {
+  const row = createCodeRow(codeIndex);
+  document.getElementById('codesEditor').appendChild(row);
+  wireCodeRow(row, codeIndex);
+  codeIndex++;
+});
 
-  htmlElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
+// Add initial row
+document.getElementById('addCodeBtn').click();
 
-  if (newTheme === 'light') {
-    moonIcon.style.display = 'block';
-    sunIcon.style.display = 'none';
+// Submit Add Community Form
+document.getElementById('submitAddForm').addEventListener('click', async () => {
+  const form = document.getElementById('addForm');
+
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
+  // Check if at least one code has a value
+  const codeInputs = form.querySelectorAll('input[name*="[code]"]');
+  let hasCode = false;
+  for (const input of codeInputs) {
+    if (input.value.trim()) {
+      hasCode = true;
+      break;
+    }
+  }
+
+  if (!hasCode) {
+    showAlert('Please add at least one code.', 'Error');
+    return;
+  }
+
+  form.submit();
+});
+
+function wireCodeRow(row, index) {
+  const fileInput = row.querySelector(`#file-${index}`);
+  const preview = row.querySelector(`#preview-${index}`);
+  const previewImg = preview.querySelector('img');
+  const photoInput = row.querySelector(`#photo-${index}`);
+  const status = row.querySelector(`#status-${index}`);
+  const removeBtn = row.querySelector('.btn-remove-code');
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    status.textContent = 'Uploading...';
+    status.style.color = 'var(--muted)';
+
+    const fd = new FormData();
+    fd.append('key', ADMIN_KEY);
+    fd.append('photo', file);
+
+    // Get community name for filename
+    const communityInput = document.querySelector('input[name="community"]');
+    if (communityInput && communityInput.value.trim()) {
+      fd.append('community_name', communityInput.value.trim());
+    }
+
+    try {
+      const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
+        method: 'POST',
+        body: fd
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'ok' && result.url) {
+        photoInput.value = result.url;
+        // Show preview with full URL
+        const fullUrl = result.url.startsWith('http') ? result.url : `<?= ASSETS_URL ?>${result.url.replace('assets/', '')}`;
+        previewImg.src = fullUrl;
+        preview.classList.add('show');
+        status.textContent = 'Uploaded!';
+        status.style.color = 'var(--brand)';
+      } else {
+        status.textContent = `Error: ${result.error || 'Upload failed'}`;
+        status.style.color = 'var(--danger)';
+      }
+    } catch (error) {
+      status.textContent = 'Network error';
+      status.style.color = 'var(--danger)';
+    }
+  });
+
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+  });
+}
+
+// DELETE COMMUNITY
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-delete-comm')) {
+    const community = e.target.getAttribute('data-community');
+    if (!confirm(`Delete community "${community}"?`)) return;
+
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.innerHTML = `
+      <input type="hidden" name="key" value="${ADMIN_KEY}">
+      <input type="hidden" name="action" value="delete_comm">
+      <input type="hidden" name="community" value="${community}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+  }
+});
+
+// EDIT COMMUNITY MODAL
+const editModal = document.getElementById('editModal');
+const editModalTitle = document.getElementById('editModalTitle');
+const editCommunityForm = document.getElementById('editCommunityForm');
+const editOriginalName = document.getElementById('editOriginalName');
+const editCommunityName = document.getElementById('editCommunityName');
+const editCityName = document.getElementById('editCityName');
+const editCodesContainer = document.getElementById('editCodesContainer');
+const closeEditModal = document.getElementById('closeEditModal');
+const cancelEditModal = document.getElementById('cancelEditModal');
+const saveEditModal = document.getElementById('saveEditModal');
+const addEditCodeBtn = document.getElementById('addEditCodeBtn');
+
+let editCodeIndex = 0;
+const editCodeFiles = new Map();
+
+// Load gates.json data
+const gatesData = <?= json_encode($data) ?>;
+
+function openEditModal(communityName) {
+  const community = gatesData.find(c => c.community === communityName);
+  if (!community) {
+    showAlert('Community not found', 'Error');
+    return;
+  }
+
+  editModalTitle.textContent = `Edit: ${communityName}`;
+  editOriginalName.value = communityName;
+  editCommunityName.value = communityName;
+  editCityName.value = community.city || '';
+  editCodesContainer.innerHTML = '';
+  editCodeIndex = 0;
+  editCodeFiles.clear();
+
+  // Load existing codes
+  if (community.codes && community.codes.length > 0) {
+    community.codes.forEach((code, idx) => {
+      addEditCodeRow(code);
+    });
   } else {
-    moonIcon.style.display = 'none';
-    sunIcon.style.display = 'block';
+    addEditCodeRow();
+  }
+
+  editModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModalFunc() {
+  editModal.classList.remove('open');
+  document.body.style.overflow = '';
+  editCodesContainer.innerHTML = '';
+  editCodeFiles.clear();
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function addEditCodeRow(codeData = null) {
+  const index = editCodeIndex++;
+  const div = document.createElement('div');
+  div.className = 'edit-code-item';
+  div.setAttribute('data-edit-index', index);
+
+  const photoUrl = codeData?.photo ? `<?= ASSETS_URL ?>${codeData.photo.replace('assets/', '')}` : '';
+  const code = codeData?.code || '';
+  const notes = codeData?.notes || '';
+  const details = codeData?.details || '';
+  const photo = codeData?.photo || '';
+
+  div.innerHTML = `
+    <div class="edit-code-header">
+      <strong style="color: var(--text);">Code #${index + 1}</strong>
+      <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${index}">Remove</button>
+    </div>
+    <div class="edit-code-grid">
+      <div class="form-group">
+        <label class="form-label">Code</label>
+        <input type="text" class="field" name="codes[${index}][code]" value="${escapeHtml(code)}" placeholder="e.g., #54839*" required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="field" name="codes[${index}][notes]" value="${escapeHtml(notes)}" placeholder="e.g., Main entrance">
+      </div>
+      <div class="form-group edit-code-full">
+        <label class="form-label">Details</label>
+        <textarea class="field" name="codes[${index}][details]" placeholder="Additional details">${escapeHtml(details)}</textarea>
+      </div>
+      <div class="form-group edit-code-full">
+        <label class="form-label">Photo</label>
+        <input type="file" class="edit-file-input" accept="image/*" id="edit-file-${index}" data-index="${index}">
+        <div class="preview-box ${photoUrl ? 'show' : ''}" id="edit-preview-${index}">
+          <img class="preview-thumb" src="${escapeHtml(photoUrl)}" alt="preview">
+        </div>
+        <input type="hidden" name="codes[${index}][photo]" id="edit-photo-${index}" value="${escapeHtml(photo)}">
+        <div class="upload-status" id="edit-status-${index}" style="margin-top: 8px; font-size: 0.85rem;"></div>
+      </div>
+    </div>
+  `;
+
+  editCodesContainer.appendChild(div);
+  wireEditCodeRow(div, index);
+}
+
+function wireEditCodeRow(row, index) {
+  const fileInput = row.querySelector(`#edit-file-${index}`);
+  const preview = row.querySelector(`#edit-preview-${index}`);
+  const previewImg = preview.querySelector('img');
+  const photoInput = row.querySelector(`#edit-photo-${index}`);
+  const status = row.querySelector(`#edit-status-${index}`);
+  const removeBtn = row.querySelector('.btn-remove-edit-code');
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    status.textContent = 'Uploading...';
+    status.style.color = 'var(--muted)';
+
+    const fd = new FormData();
+    fd.append('key', ADMIN_KEY);
+    fd.append('photo', file);
+
+    try {
+      const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
+        method: 'POST',
+        body: fd
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'ok' && result.url) {
+        photoInput.value = result.url;
+        previewImg.src = result.url;
+        preview.classList.add('show');
+        status.textContent = 'Uploaded!';
+        status.style.color = 'var(--brand)';
+      } else {
+        status.textContent = `Error: ${result.error || 'Upload failed'}`;
+        status.style.color = 'var(--danger)';
+      }
+    } catch (error) {
+      status.textContent = 'Network error';
+      status.style.color = 'var(--danger)';
+    }
+  });
+
+  removeBtn.addEventListener('click', () => {
+    if (editCodesContainer.children.length <= 1) {
+      showAlert('Cannot remove the last code. A community must have at least one code.', 'Error');
+      return;
+    }
+    row.remove();
+  });
+}
+
+addEditCodeBtn.addEventListener('click', () => {
+  addEditCodeRow();
+});
+
+closeEditModal.addEventListener('click', closeEditModalFunc);
+cancelEditModal.addEventListener('click', closeEditModalFunc);
+
+saveEditModal.addEventListener('click', () => {
+  if (editCommunityForm.checkValidity()) {
+    editCommunityForm.submit();
+  } else {
+    editCommunityForm.reportValidity();
+  }
+});
+
+// Close modal on background click
+editModal.addEventListener('click', (e) => {
+  if (e.target === editModal) {
+    closeEditModalFunc();
+  }
+});
+
+// Close modal on ESC
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && editModal.classList.contains('open')) {
+    closeEditModalFunc();
+  }
+});
+
+// Open edit modal when clicking Edit button
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-edit-comm')) {
+    const community = e.target.getAttribute('data-community');
+    openEditModal(community);
+  }
+});
+
+// PIN MANAGEMENT
+const addPinBtn = document.getElementById('addPinBtn');
+const pinFormCard = document.getElementById('pinFormCard');
+const pinForm = document.getElementById('pinForm');
+const pinFormTitle = document.getElementById('pinFormTitle');
+const pinFormAction = document.getElementById('pinFormAction');
+const pinFormIndex = document.getElementById('pinFormIndex');
+const pinName = document.getElementById('pinName');
+const pinValue = document.getElementById('pinValue');
+const cancelPinBtn = document.getElementById('cancelPinBtn');
+
+addPinBtn.addEventListener('click', () => {
+  pinFormTitle.textContent = 'Add New PIN';
+  pinFormAction.value = 'add_pin';
+  pinFormIndex.value = '';
+  pinName.value = '';
+  pinValue.value = '';
+  pinFormCard.style.display = 'block';
+  pinFormCard.scrollIntoView({ behavior: 'smooth' });
+});
+
+cancelPinBtn.addEventListener('click', () => {
+  pinFormCard.style.display = 'none';
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-edit-pin')) {
+    const index = e.target.getAttribute('data-index');
+    const name = e.target.getAttribute('data-name');
+    const pin = e.target.getAttribute('data-pin');
+
+    pinFormTitle.textContent = 'Edit PIN';
+    pinFormAction.value = 'update_pin';
+    pinFormIndex.value = index;
+    pinName.value = name;
+    pinValue.value = pin;
+    pinFormCard.style.display = 'block';
+    pinFormCard.scrollIntoView({ behavior: 'smooth' });
+  }
+});
+
+// JSON FILE UPLOAD
+const jsonFileInput = document.getElementById('jsonFileInput');
+if (jsonFileInput) {
+  jsonFileInput.addEventListener('change', function() {
+    if (this.files.length > 0) {
+      const fileName = this.files[0].name;
+      if (!fileName.endsWith('.json')) {
+        showAlert('Please select a valid JSON file.', 'Error');
+        this.value = '';
+        return;
+      }
+      if (confirm(`Upload "${fileName}" and replace current gates.json?\n\nA backup will be created automatically.`)) {
+        document.getElementById('uploadJsonForm').submit();
+      } else {
+        this.value = '';
+      }
+    }
+  });
+}
+
+// ADD NEW MODAL
+const addNewModal = document.getElementById('addNewModal');
+const openAddNewModalBtn = document.getElementById('openAddNewModal');
+const closeAddNewModalBtn = document.getElementById('closeAddNewModal');
+const cancelAddNewModalBtn = document.getElementById('cancelAddNewModal');
+const saveAddNewModalBtn = document.getElementById('saveAddNewModal');
+const addNewForm = document.getElementById('addNewForm');
+const addNewCodesContainer = document.getElementById('addNewCodesContainer');
+const addNewCodeBtn = document.getElementById('addNewCodeBtn');
+const addNewCommunityName = document.getElementById('addNewCommunityName');
+
+let addNewCodeIndex = 0;
+const addNewCodeFiles = new Map();
+
+function openAddNewModal() {
+  addNewModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  addNewCommunityName.value = '';
+  addNewCodesContainer.innerHTML = '';
+  addNewCodeIndex = 0;
+  addNewCodeFiles.clear();
+  // Add initial code row
+  addAddNewCodeRow();
+}
+
+function closeAddNewModal() {
+  addNewModal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function createAddNewCodeRow(index) {
+  const div = document.createElement('div');
+  div.className = 'edit-code-item';
+  div.style.marginBottom = '16px';
+  div.innerHTML = `
+    <div class="edit-code-header">
+      <strong style="color: var(--text);">Code #${index + 1}</strong>
+      <button type="button" class="btn btn-danger btn-remove-add-code">Remove</button>
+    </div>
+    <div class="edit-code-grid">
+      <!-- Code and Notes side by side -->
+      <div class="form-group">
+        <label class="form-label">Code</label>
+        <input type="text" class="field" name="codes[${index}][code]" placeholder="e.g., #54839*" required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input type="text" class="field" name="codes[${index}][notes]" placeholder="e.g., Main entrance">
+      </div>
+
+      <!-- Details full width below -->
+      <div class="form-group edit-code-full">
+        <label class="form-label">Details</label>
+        <textarea class="field" name="codes[${index}][details]" placeholder="Additional details" rows="3"></textarea>
+      </div>
+
+      <!-- Upload Photo full width below -->
+      <div class="form-group edit-code-full">
+        <label class="form-label">Upload Photo</label>
+        <input type="file" class="field" accept="image/*" id="addNewFile-${index}">
+        <div class="preview-container" id="addNewPreview-${index}" style="display: none; margin-top: 8px;">
+          <img src="" style="max-width: 200px; border-radius: 8px;">
+        </div>
+        <input type="hidden" name="codes[${index}][photo]" id="addNewPhoto-${index}">
+        <div class="upload-status" id="addNewStatus-${index}" style="margin-top: 8px; font-size: 0.85rem; color: var(--muted);"></div>
+      </div>
+    </div>
+  `;
+  return div;
+}
+
+function addAddNewCodeRow(codeData = null) {
+  const row = createAddNewCodeRow(addNewCodeIndex);
+  addNewCodesContainer.appendChild(row);
+
+  const fileInput = row.querySelector(`#addNewFile-${addNewCodeIndex}`);
+  const preview = row.querySelector(`#addNewPreview-${addNewCodeIndex}`);
+  const photoInput = row.querySelector(`#addNewPhoto-${addNewCodeIndex}`);
+  const status = row.querySelector(`#addNewStatus-${addNewCodeIndex}`);
+  const removeBtn = row.querySelector('.btn-remove-add-code');
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    status.textContent = 'Uploading...';
+    status.style.color = 'var(--muted)';
+
+    const fd = new FormData();
+    fd.append('key', ADMIN_KEY);
+    fd.append('photo', file);
+
+    if (addNewCommunityName.value.trim()) {
+      fd.append('community_name', addNewCommunityName.value.trim());
+    }
+
+    try {
+      const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
+        method: 'POST',
+        body: fd
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'ok' && result.url) {
+        photoInput.value = result.url;
+        const img = preview.querySelector('img');
+        const fullUrl = result.url.startsWith('http') ? result.url : `<?= ASSETS_URL ?>${result.url.replace('assets/', '')}`;
+        img.src = fullUrl;
+        preview.style.display = 'block';
+        status.textContent = 'Uploaded!';
+        status.style.color = 'var(--brand)';
+      } else {
+        status.textContent = `Error: ${result.error || 'Upload failed'}`;
+        status.style.color = 'var(--danger)';
+      }
+    } catch (error) {
+      status.textContent = 'Network error';
+      status.style.color = 'var(--danger)';
+    }
+  });
+
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+  });
+
+  addNewCodeIndex++;
+}
+
+openAddNewModalBtn.addEventListener('click', openAddNewModal);
+closeAddNewModalBtn.addEventListener('click', closeAddNewModal);
+cancelAddNewModalBtn.addEventListener('click', closeAddNewModal);
+
+addNewCodeBtn.addEventListener('click', () => {
+  addAddNewCodeRow();
+});
+
+saveAddNewModalBtn.addEventListener('click', () => {
+  if (!addNewForm.checkValidity()) {
+    addNewForm.reportValidity();
+    return;
+  }
+
+  // Get community name
+  const communityName = addNewCommunityName.value.trim();
+
+  // Check if at least one code has a value
+  const codeInputs = addNewForm.querySelectorAll('input[name*="[code]"]');
+  let hasCode = false;
+  const newCodes = [];
+
+  for (const input of codeInputs) {
+    const codeValue = input.value.trim();
+    if (codeValue) {
+      hasCode = true;
+      newCodes.push(codeValue.toLowerCase());
+    }
+  }
+
+  if (!hasCode) {
+    showAlert('Please add at least one code.', 'Error');
+    return;
+  }
+
+  // Check if community exists and if any code already exists
+  const existingCommunity = gatesData.find(c =>
+    c.community.toLowerCase() === communityName.toLowerCase()
+  );
+
+  if (existingCommunity && existingCommunity.codes) {
+    const existingCodes = existingCommunity.codes.map(c =>
+      (c.code || '').toLowerCase()
+    );
+
+    const duplicates = newCodes.filter(code => existingCodes.includes(code));
+
+    if (duplicates.length > 0) {
+      const duplicateList = duplicates.map(c => c.toUpperCase()).join(', ');
+      showAlert(
+        `The following code(s) already exist in "${communityName}": ${duplicateList}`,
+        'Duplicate Code Error'
+      );
+      return;
+    }
+  }
+
+  addNewForm.submit();
+});
+
+// Close modal on ESC
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && addNewModal.classList.contains('open')) {
+    closeAddNewModal();
+  }
+});
+
+// Close modal on overlay click
+addNewModal.addEventListener('click', (e) => {
+  if (e.target === addNewModal) {
+    closeAddNewModal();
   }
 });
 </script>
-</body>
-</html>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>

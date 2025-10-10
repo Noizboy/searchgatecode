@@ -1,6 +1,6 @@
 [
     {
-        "community": "Water Oaks",
+        "community": "Water Oaks 22",
         "codes": [
             {
                 "code": "#54839",
@@ -8,7 +8,8 @@
                 "details": "Keypad on the left pillar after the visitor lane. Gate closes fast; keep the van close.",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "Lakeland"
     },
     {
         "community": "Maple Ridge",
@@ -17,15 +18,22 @@
                 "code": "#4578",
                 "notes": "Keypad at left lane",
                 "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
-                "photo": "/assets/gate_20250928_212518_038e2e.jpg"
+                "photo": "assets/gate_20251003_160316_2a4c80.jpg"
             },
             {
                 "code": "#4579",
                 "notes": "Back gate (contractors)",
                 "details": "Back entrance used by contractors. Keypad on a short pole; visibility is low at night.",
-                "photo": "/assets/gate_20250928_212518_a02373.jpg"
+                "photo": "assets/gate_20251003_160316_f1466c.jpg"
+            },
+            {
+                "code": "5555",
+                "notes": "55",
+                "details": "555",
+                "photo": "assets/thumbnailnone.png"
             }
-        ]
+        ],
+        "city": "Lakeland"
     },
     {
         "community": "yarey",
@@ -52,6 +60,18 @@
                 "notes": "main",
                 "details": "ffgh345234",
                 "photo": "assets/gate-call-box-residential.jpg"
+            },
+            {
+                "code": "5555",
+                "notes": "555",
+                "details": "555",
+                "photo": "assets/gate-call-box-residential.jpg"
+            },
+            {
+                "code": "3456456",
+                "notes": "34564564",
+                "details": "34564564",
+                "photo": "assets/gate-call-box-residential.jpg"
             }
         ]
     },
@@ -61,7 +81,7 @@
             {
                 "code": "*1143",
                 "notes": "Main Gate",
-                "photo": "/assets/gate_20251001_114322_1e545c.jpg"
+                "photo": "assets/gate_20251001_114322_1e545c.jpg"
             }
         ]
     },
@@ -317,5 +337,160 @@
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ]
+    },
+    {
+        "community": "nuevonuevo",
+        "codes": [
+            {
+                "code": "35634",
+                "notes": "Main entrance",
+                "photo": "assets/thumbnailnone.png"
+            },
+            {
+                "code": "nuevonuevo",
+                "notes": "nuevonuevo",
+                "details": "nuevonuevo",
+                "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg",
+                "coordinates": {
+                    "latitude": 28.3217198,
+                    "longitude": -81.38180539999999
+                }
+            }
+        ],
+        "city": "nuevonuevo",
+        "submitted_date": "2025-10-09 22:28:52"
+    },
+    {
+        "community": "testing",
+        "codes": [
+            {
+                "code": "5555",
+                "notes": "555",
+                "details": "555",
+                "photo": "assets/thumbnailnone.png"
+            }
+        ]
+    },
+    {
+        "community": "testing 2",
+        "codes": [
+            {
+                "code": "555",
+                "notes": "5555",
+                "details": "555",
+                "photo": "assets/gate_20251008_004011_4567fc.jpg"
+            }
+        ]
+    },
+    {
+        "community": "probando222",
+        "codes": [
+            {
+                "code": "222",
+                "notes": "22",
+                "photo": "assets/thumbnailnone.png"
+            }
+        ]
+    },
+    {
+        "community": "probandoprobando",
+        "codes": [
+            {
+                "code": "345",
+                "notes": "345",
+                "details": "345",
+                "photo": "assets/gate_20251009_161925_a24d83.jpg"
+            },
+            {
+                "code": "456456",
+                "notes": "4645645",
+                "details": "4564",
+                "photo": "assets/gate_20251009_161925_a24d83.jpg"
+            },
+            {
+                "code": "678678",
+                "notes": "5645",
+                "details": "6456",
+                "photo": "assets/gate_20251009_162101_64288f.jpg"
+            }
+        ]
+    },
+    {
+        "community": "www",
+        "codes": [
+            {
+                "code": "www",
+                "photo": "assets/thumbnailnone.png"
+            }
+        ]
+    },
+    {
+        "community": "holahola",
+        "codes": [
+            {
+                "code": "holahola",
+                "notes": "holahola",
+                "details": "holahola",
+                "photo": "assets/gate_holahola_20251009_214755.jpg"
+            },
+            {
+                "code": "holahola",
+                "notes": "holahola2",
+                "details": "holahola2",
+                "photo": "assets/thumbnailnone.png"
+            },
+            {
+                "code": "yasabe",
+                "notes": "yasabe",
+                "details": "yasabe",
+                "photo": "assets/gate_holahola_20251009_214755.jpg"
+            }
+        ]
+    },
+    {
+        "community": "orlando3254354",
+        "codes": [
+            {
+                "code": "orlando3254354",
+                "notes": "orlando3254354",
+                "details": "orlando3254354",
+                "photo": ""
+            }
+        ],
+        "city": "orlando3254354"
+    },
+    {
+        "community": "Testeando22",
+        "codes": [
+            {
+                "code": "Testeando",
+                "notes": "Testeando",
+                "details": "Testeando",
+                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg",
+                "coordinates": {
+                    "latitude": 28.3217198,
+                    "longitude": -81.38180539999999
+                }
+            }
+        ],
+        "city": "Testeando",
+        "submitted_date": "2025-10-09 22:31:32"
+    },
+    {
+        "community": "santo",
+        "codes": [
+            {
+                "code": "1111",
+                "notes": "main entrance",
+                "details": "55345",
+                "photo": "assets/temp_gate_20251009_224631_96bdfb.jpg",
+                "coordinates": {
+                    "latitude": 28.3217198,
+                    "longitude": -81.38180539999999
+                }
+            }
+        ],
+        "city": "distrito nacional",
+        "submitted_date": "2025-10-09 22:46:34"
     }
 ]

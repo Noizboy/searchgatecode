@@ -372,7 +372,7 @@
   </main>
 
   <footer>
-      <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a> | <a href="submit.html">Submit Community</a></span>
+      <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a> | <a href="submit.php">Submit Community</a></span>
 
   </footer>
 
