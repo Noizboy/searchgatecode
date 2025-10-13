@@ -117,12 +117,7 @@ require_once __DIR__ . '/includes/header.php';
         </div>
         <div class="btn-group">
           <button class="btn btn-edit-pin" data-index="<?= $idx ?>" data-name="<?= htmlspecialchars($pin['name'] ?? '') ?>" data-pin="<?= htmlspecialchars($pin['pin'] ?? '') ?>">Edit</button>
-          <form method="post" style="display: inline;">
-            <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
-            <input type="hidden" name="action" value="delete_pin">
-            <input type="hidden" name="index" value="<?= $idx ?>">
-            <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this PIN?')">Delete</button>
-          </form>
+          <button type="button" class="btn btn-danger btn-delete-user-pin" data-index="<?= $idx ?>">Delete</button>
         </div>
       </div>
     <?php endforeach; endif; ?>
@@ -435,12 +430,54 @@ document.addEventListener('click', (e) => {
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
 
 <script>
+// Delete PIN handler
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-delete-user-pin')) {
+    const index = e.target.getAttribute('data-index');
+
+    showAlert({
+      type: 'warning',
+      title: 'Delete PIN',
+      message: 'Are you sure you want to delete this PIN? This action cannot be undone.',
+      buttons: [
+        {
+          text: 'No',
+          className: 'btn-alert-secondary'
+        },
+        {
+          text: 'Yes',
+          className: 'btn-alert-danger',
+          onClick: () => {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.innerHTML = `
+              <input type="hidden" name="key" value="${ADMIN_KEY}">
+              <input type="hidden" name="action" value="delete_pin">
+              <input type="hidden" name="index" value="${index}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+          }
+        }
+      ]
+    });
+  }
+});
+
 // Show flash messages after footer is loaded (showAlert is defined there)
 <?php if ($flashMsg): ?>
-  showAlert('<?= addslashes($flashMsg) ?>', 'Success');
+  showAlert({
+    type: 'success',
+    title: 'Success',
+    message: '<?= addslashes($flashMsg) ?>'
+  });
 <?php endif; ?>
 
 <?php if ($errorMsg): ?>
-  showAlert('<?= addslashes($errorMsg) ?>', 'Error');
+  showAlert({
+    type: 'error',
+    title: 'Error',
+    message: '<?= addslashes($errorMsg) ?>'
+  });
 <?php endif; ?>
 </script>

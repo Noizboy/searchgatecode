@@ -492,64 +492,118 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, .7);
+    backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 10000;
     padding: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
   }
 
   .alert-modal.open {
     display: flex;
+    opacity: 1;
   }
 
   .alert-modal-content {
-    width: min(90vw, 500px);
+    width: min(90vw, 400px);
     background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
     border: 1px solid var(--modal-border);
-    border-radius: 16px;
-    overflow: hidden;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
     box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
   }
 
   .alert-modal-icon {
-    padding: 24px 24px 0 24px;
-    text-align: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .alert-modal-icon.success {
+    background: linear-gradient(135deg, rgba(59, 221, 130, 0.2), rgba(27, 191, 103, 0.15));
+  }
+
+  .alert-modal-icon.error {
+    background: linear-gradient(135deg, rgba(255, 92, 92, 0.2), rgba(229, 57, 53, 0.15));
+  }
+
+  .alert-modal-icon.warning {
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
   }
 
   .alert-icon-svg {
-    width: 48px;
-    height: 48px;
-    color: var(--brand);
-  }
-
-  .alert-modal-body {
-    padding: 16px 24px 24px 24px;
-    text-align: center;
+    width: 32px;
+    height: 32px;
   }
 
   .alert-modal-title {
-    margin: 0 0 8px 0;
-    font-size: 1.3rem;
+    font-size: 1.25rem;
     font-weight: 700;
+    margin-bottom: 8px;
     color: var(--text);
   }
 
   .alert-modal-message {
-    margin: 0;
-    color: var(--text);
-    line-height: 1.5;
     font-size: 0.95rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
   }
 
-  .alert-modal-footer {
-    padding: 16px 24px 24px 24px;
+  .alert-modal-actions {
     display: flex;
+    gap: 12px;
     justify-content: center;
   }
 
-  .alert-modal-footer .btn {
-    min-width: 120px;
+  .btn-alert {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 0;
+  }
+
+  .btn-alert-primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: #07140c;
+    box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+  }
+
+  .btn-alert-primary:hover {
+    box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+    transform: translateY(-1px);
+  }
+
+  .btn-alert-danger {
+    background: linear-gradient(135deg, var(--danger), var(--danger-2));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+  }
+
+  .btn-alert-danger:hover {
+    box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+    transform: translateY(-1px);
+  }
+
+  .btn-alert-secondary {
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    border: 1px solid var(--btn-secondary-border);
+  }
+
+  .btn-alert-secondary:hover {
+    background: var(--btn-secondary-hover);
   }
 </style>
 </head>

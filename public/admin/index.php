@@ -1,6 +1,7 @@
 <?php
 /******************** CONFIG ********************/
 const ADMIN_KEY   = '43982';
+const APP_VERSION = '1.0.0';
 const GATES_JSON  = __DIR__ . '/../data/gates.json';
 const SUGGEST_JSON = __DIR__ . '/../data/suggest.json';
 const PIN_JSON = __DIR__ . '/../data/pin.json';
@@ -456,6 +457,8 @@ if ($action === 'delete_code') {
   $code = trim($_POST['code']??'');
   $idx = find_comm_index($data,$comm);
   $failed = [];
+  $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+
   if($idx>=0){
     $list = $data[$idx]['codes'] ?? [];
     $new=[];
@@ -474,17 +477,59 @@ if ($action === 'delete_code') {
     if(empty($new)) {
       array_splice($data,$idx,1);
       write_json(GATES_JSON,$data);
+      if ($is_ajax) {
+        http_response_code(200);
+        echo json_encode(['success' => true, 'message' => 'Code deleted. Community emptied and removed.']);
+        exit;
+      }
       header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
       exit;
     }
     write_json(GATES_JSON,$data);
     $flash='Code deleted.';
     if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
+    if ($is_ajax) {
+      http_response_code(200);
+      echo json_encode(['success' => true, 'message' => $flash]);
+      exit;
+    }
     header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
     exit;
   } else {
+    if ($is_ajax) {
+      http_response_code(404);
+      echo json_encode(['success' => false, 'message' => 'Community not found.']);
+      exit;
+    }
     $msg='Community not found.';
   }
+}
+
+// CLEAR REPORTS
+if ($action === 'clear_reports') {
+  $data = read_json(GATES_JSON);
+  $community_idx = intval($_POST['community_idx'] ?? -1);
+  $code_idx = intval($_POST['code_idx'] ?? -1);
+
+  if ($community_idx >= 0 && $code_idx >= 0 && isset($data[$community_idx]['codes'][$code_idx])) {
+    // Set report_count to 0
+    $data[$community_idx]['codes'][$code_idx]['report_count'] = 0;
+
+    // Save the updated data
+    $success = write_json(GATES_JSON, $data);
+
+    if ($success) {
+      http_response_code(200);
+      echo json_encode(['success' => true, 'message' => 'Reports cleared successfully']);
+    } else {
+      http_response_code(500);
+      echo json_encode(['success' => false, 'message' => 'Failed to save data']);
+    }
+  } else {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Invalid request parameters']);
+  }
+  exit;
 }
 
 // DELETE COMMUNITY
@@ -668,6 +713,21 @@ $q = trim($_GET['q'] ?? '');
 $section = trim($_GET['section'] ?? 'home');
 $edit = trim($_GET['edit'] ?? '');
 $msg = $_GET['flash'] ?? $msg;
+
+// Calculate statistics
+$total_communities = count($data);
+$total_contributions = count($suggestions);
+$total_users = count($pins);
+$total_reported = 0;
+foreach ($data as $community) {
+  if (isset($community['codes'])) {
+    foreach ($community['codes'] as $code) {
+      if (isset($code['report_count']) && $code['report_count'] > 0) {
+        $total_reported++;
+      }
+    }
+  }
+}
 
 function match_row($row,$q){
   if($q==='') return true;
@@ -995,6 +1055,18 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .btn-danger:hover {
     background: linear-gradient(135deg, #E23D3D, #c73030);
     box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+  }
+
+  .btn-clear-reports {
+    background: linear-gradient(135deg, #FFA726, #FB8C00);
+    border: 0;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 167, 38, .4);
+  }
+
+  .btn-clear-reports:hover {
+    background: linear-gradient(135deg, #FB8C00, #F57C00);
+    box-shadow: 0 6px 18px rgba(255, 167, 38, .55);
   }
 
   .btn-group {
@@ -1658,69 +1730,140 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     font-size: 0.85rem;
   }
 
-  /* ALERT MODAL */
-  .alert-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .7);
-    display: none;
+  /* STATISTICS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-2));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(59, 221, 130, .15);
+  }
+
+  .stat-card:hover::before {
+    opacity: 1;
+  }
+
+  .stat-card.danger::before {
+    background: linear-gradient(90deg, var(--danger), var(--danger-2));
+  }
+
+  .stat-card.danger:hover {
+    box-shadow: 0 8px 24px rgba(255, 92, 92, .15);
+  }
+
+  .stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
-    padding: 20px;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, rgba(59, 221, 130, 0.15), rgba(27, 191, 103, 0.1));
   }
 
-  .alert-modal.open {
-    display: flex;
+  .stat-icon svg {
+    width: 28px;
+    height: 28px;
+    fill: var(--brand);
   }
 
-  .alert-modal-content {
-    width: min(90vw, 500px);
-    background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
-    border: 1px solid var(--modal-border);
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+  .stat-icon.danger {
+    background: linear-gradient(135deg, rgba(255, 92, 92, 0.15), rgba(229, 57, 53, 0.1));
   }
 
-  .alert-modal-icon {
-    padding: 24px 24px 0 24px;
-    text-align: center;
+  .stat-icon.danger svg {
+    fill: var(--danger);
   }
 
-  .alert-icon-svg {
-    width: 48px;
-    height: 48px;
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 800;
     color: var(--brand);
+    margin: 6px 0;
+    line-height: 1;
   }
 
-  .alert-modal-body {
-    padding: 16px 24px 24px 24px;
-    text-align: center;
+  .stat-number.danger {
+    color: var(--danger);
   }
 
-  .alert-modal-title {
-    margin: 0 0 8px 0;
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--text);
+  .stat-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 12px;
   }
 
-  .alert-modal-message {
-    margin: 0;
-    color: var(--text);
-    line-height: 1.5;
-    font-size: 0.95rem;
+  .stat-button {
+    margin-top: 12px;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
   }
 
-  .alert-modal-footer {
-    padding: 16px 24px 24px 24px;
-    display: flex;
-    justify-content: center;
+  .stat-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(59, 221, 130, .3);
   }
 
-  .alert-modal-footer .btn {
-    min-width: 120px;
+  .stat-button.danger {
+    background: linear-gradient(135deg, var(--danger), var(--danger-2));
+  }
+
+  .stat-button.danger:hover {
+    box-shadow: 0 4px 12px rgba(255, 92, 92, .3);
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 </head>
@@ -1750,109 +1893,63 @@ require_once __DIR__ . '/includes/sidebar.php';
           </svg>
         </button>
         <div class="page-header-content">
-          <h1 class="page-title">Communities</h1>
-          <p class="page-subtitle">Manage your community gate codes</p>
+          <h1 class="page-title">Welcome to Admin Dashboard</h1>
+          <p class="page-subtitle">Manage your communities, contributions, and system settings</p>
         </div>
       </div>
-      <div class="page-header-right">
-        <button class="btn btn-primary" id="openAddNewModal">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="margin-right: 6px;">
-            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+    </div>
+
+    <!-- STATISTICS GRID -->
+    <div class="stats-grid">
+      <!-- Total Communities -->
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
           </svg>
-          Add New
-        </button>
+        </div>
+        <div class="stat-number"><?= $total_communities ?></div>
+        <div class="stat-label">Total Communities</div>
+        <a href="communities.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Communities</a>
+      </div>
+
+      <!-- Pending Contributions -->
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="stat-number"><?= $total_contributions ?></div>
+        <div class="stat-label">Pending Contributions</div>
+        <a href="contributions.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Contributions </a>
+      </div>
+
+      <!-- Registered Users -->
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+          </svg>
+        </div>
+        <div class="stat-number"><?= $total_users ?></div>
+        <div class="stat-label">Registered Users</div>
+        <a href="users.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Users</a>
+      </div>
+
+      <!-- Reported Codes -->
+      <div class="stat-card danger">
+        <div class="stat-icon danger">
+          <svg fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="stat-number danger"><?= $total_reported ?></div>
+        <div class="stat-label">Reported Codes</div>
+        <button class="stat-button danger" onclick="showReportedCodes()">View Codes</button>
       </div>
     </div>
-
-    <!-- HOME SECTION -->
-    <div class="home-container">
-      <!-- SEARCH BAR - STATIC -->
-      <div class="search-section">
-        <div class="search-bar-container">
-          <input type="text" class="field" id="searchInput" placeholder="Search by community or code..." value="<?= htmlspecialchars($q) ?>">
-          <button class="btn btn-primary" id="searchBtn">Search</button>
-        </div>
-      </div>
-
-      <!-- COMMUNITIES CARD - SCROLLABLE -->
-      <div class="card home-card">
-        <div class="communities-scroll-wrapper">
-          <div class="communities-grid" id="communitiesList">
-          <?php if(empty($filtered)): ?>
-            <div class="empty-state">
-              <div class="empty-state-icon">📭</div>
-              <p>No communities found.</p>
-            </div>
-          <?php else: foreach($filtered as $row): ?>
-            <div class="community-item">
-              <div class="community-header">
-                <div class="community-name">
-                  <?= htmlspecialchars($row['community']) ?>
-                  <?php if (!empty($row['city'])): ?>
-                    <span style="color: var(--muted); font-weight: 500;"> - <?= htmlspecialchars($row['city']) ?></span>
-                  <?php endif; ?>
-                </div>
-                <div class="btn-group">
-                  <button class="btn btn-edit-comm" data-community="<?= htmlspecialchars($row['community']) ?>">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                    View
-                  </button>
-                </div>
-              </div>
-              <div class="codes-list">
-                <?php foreach(($row['codes']??[]) as $code):
-                  $p = web_photo($code['photo'] ?? '');
-                ?>
-                  <div class="code-item">
-                    <img class="code-thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
-                    <div class="code-info">
-                      <div class="code-value"><?= htmlspecialchars($code['code'] ?? '') ?></div>
-                      <?php if(!empty($code['notes'])): ?>
-                        <div class="code-note"><?= htmlspecialchars($code['notes']) ?></div>
-                      <?php endif; ?>
-                      <?php if(!empty($code['details'])): ?>
-                        <div class="code-note"><?= htmlspecialchars($code['details']) ?></div>
-                      <?php endif; ?>
-                    </div>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-            </div>
-          <?php endforeach; endif; ?>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ADD NEW SECTION -->
-    <section id="add-new-section" class="section" style="display: none;">
-      <div class="card">
-        <h2 class="card-title">Add New Community</h2>
-
-        <form method="post" id="addForm">
-          <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
-          <input type="hidden" name="action" value="add">
-
-          <div class="form-group">
-            <label class="form-label">Community Name</label>
-            <input type="text" class="field" name="community" placeholder="e.g., Water Oaks" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Codes</label>
-            <div class="codes-editor" id="codesEditor"></div>
-            <button type="button" class="btn" id="addCodeBtn" style="margin-top: 12px;">+ Add Code</button>
-          </div>
-
-          <div class="btn-group">
-            <button type="button" class="btn btn-primary" id="submitAddForm">Add Community</button>
-          </div>
-        </form>
-      </div>
-    </section>
 
     <!-- CONTRIBUTIONS SECTION -->
     <section id="contributions-section" class="section" style="display: none;">
@@ -1950,12 +2047,7 @@ require_once __DIR__ . '/includes/sidebar.php';
               </div>
               <div class="btn-group">
                 <button class="btn btn-edit-pin" data-index="<?= $idx ?>" data-name="<?= htmlspecialchars($pin['name'] ?? '') ?>" data-pin="<?= htmlspecialchars($pin['pin'] ?? '') ?>">Edit</button>
-                <form method="post" style="display: inline;">
-                  <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
-                  <input type="hidden" name="action" value="delete_pin">
-                  <input type="hidden" name="index" value="<?= $idx ?>">
-                  <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this PIN?')">Delete</button>
-                </form>
+                <button type="button" class="btn btn-danger btn-delete-pin" data-index="<?= $idx ?>">Delete</button>
               </div>
             </div>
           <?php endforeach; endif; ?>
@@ -1998,24 +2090,6 @@ require_once __DIR__ . '/includes/sidebar.php';
 <div id="imgModal" class="modal" aria-hidden="true">
   <button class="modal-close" type="button" aria-label="Close">&times;</button>
   <img id="imgModalPic" src="" alt="photo">
-</div>
-
-<!-- ALERT MODAL -->
-<div id="alertModal" class="alert-modal">
-  <div class="alert-modal-content">
-    <div class="alert-modal-icon" id="alertModalIcon">
-      <svg class="alert-icon-svg" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <div class="alert-modal-body">
-      <h3 class="alert-modal-title" id="alertModalTitle">Notification</h3>
-      <p class="alert-modal-message" id="alertModalMessage"></p>
-    </div>
-    <div class="alert-modal-footer">
-      <button class="btn btn-primary" id="alertModalOk">OK</button>
-    </div>
-  </div>
 </div>
 
 <!-- EDIT COMMUNITY MODAL -->
@@ -2120,6 +2194,21 @@ require_once __DIR__ . '/includes/sidebar.php';
     </div>
   </div>
 </div>
+
+<!-- REPORTED CODES MODAL -->
+<div id="reportedCodesModal" class="edit-modal">
+  <div class="edit-modal-content">
+    <div class="edit-modal-header">
+      <h2>Códigos Reportados</h2>
+      <button class="btn" id="closeReportedModal">✕</button>
+    </div>
+    <div class="edit-modal-body" style="max-height: 60vh; overflow-y: auto;">
+      <div id="reportedCodesList"></div>
+    </div>
+  </div>
+</div>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>
 
 <script>
 // INDEX.PHP SPECIFIC SCRIPTS
@@ -2243,7 +2332,17 @@ document.getElementById('submitAddForm').addEventListener('click', async () => {
   }
 
   if (!hasCode) {
-    showAlert('Please add at least one code.', 'Error');
+    showAlert({
+      type: 'error',
+      title: 'Error',
+      message: 'Please add at least one code.',
+      buttons: [
+        {
+          text: 'OK',
+          className: 'btn-alert-primary'
+        }
+      ]
+    });
     return;
   }
 
@@ -2310,17 +2409,33 @@ function wireCodeRow(row, index) {
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('btn-delete-comm')) {
     const community = e.target.getAttribute('data-community');
-    if (!confirm(`Delete community "${community}"?`)) return;
 
-    const form = document.createElement('form');
-    form.method = 'post';
-    form.innerHTML = `
-      <input type="hidden" name="key" value="${ADMIN_KEY}">
-      <input type="hidden" name="action" value="delete_comm">
-      <input type="hidden" name="community" value="${community}">
-    `;
-    document.body.appendChild(form);
-    form.submit();
+    showAlert({
+      type: 'warning',
+      title: 'Delete Community',
+      message: `Are you sure you want to delete "${community}"? This action cannot be undone.`,
+      buttons: [
+        {
+          text: 'No',
+          className: 'btn-alert-secondary'
+        },
+        {
+          text: 'Yes',
+          className: 'btn-alert-danger',
+          onClick: () => {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.innerHTML = `
+              <input type="hidden" name="key" value="${ADMIN_KEY}">
+              <input type="hidden" name="action" value="delete_comm">
+              <input type="hidden" name="community" value="${community}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+          }
+        }
+      ]
+    });
   }
 });
 
@@ -2348,7 +2463,17 @@ const gatesData = <?= json_encode($data) ?>;
 function openEditModal(communityName) {
   const community = gatesData.find(c => c.community === communityName);
   if (!community) {
-    showAlert('Community not found', 'Error');
+    showAlert({
+      type: 'error',
+      title: 'Error',
+      message: 'Community not found',
+      buttons: [
+        {
+          text: 'OK',
+          className: 'btn-alert-primary'
+        }
+      ]
+    });
     return;
   }
 
@@ -2508,13 +2633,7 @@ function wireEditCodeRow(row, index) {
     }
   });
 
-  removeBtn.addEventListener('click', () => {
-    if (editCodesContainer.children.length <= 1) {
-      showAlert('Cannot remove the last code. A community must have at least one code.', 'Error');
-      return;
-    }
-    row.remove();
-  });
+  // Remove button event - handled globally at the end of script
 }
 
 addEditCodeBtn.addEventListener('click', () => {
@@ -2529,23 +2648,6 @@ saveEditModal.addEventListener('click', () => {
   } else {
     editCommunityForm.reportValidity();
   }
-});
-
-// Delete Community button in modal
-const deleteEditCommunity = document.getElementById('deleteEditCommunity');
-deleteEditCommunity.addEventListener('click', () => {
-  const community = editOriginalName.value;
-  if (!confirm(`Delete community "${community}"? This action cannot be undone.`)) return;
-
-  const form = document.createElement('form');
-  form.method = 'post';
-  form.innerHTML = `
-    <input type="hidden" name="key" value="${ADMIN_KEY}">
-    <input type="hidden" name="action" value="delete_comm">
-    <input type="hidden" name="community" value="${community}">
-  `;
-  document.body.appendChild(form);
-  form.submit();
 });
 
 // Close modal on background click
@@ -2609,6 +2711,37 @@ document.addEventListener('click', (e) => {
     pinFormCard.style.display = 'block';
     pinFormCard.scrollIntoView({ behavior: 'smooth' });
   }
+
+  if (e.target.classList.contains('btn-delete-pin')) {
+    const index = e.target.getAttribute('data-index');
+
+    showAlert({
+      type: 'warning',
+      title: 'Delete PIN',
+      message: 'Are you sure you want to delete this PIN? This action cannot be undone.',
+      buttons: [
+        {
+          text: 'No',
+          className: 'btn-alert-secondary'
+        },
+        {
+          text: 'Yes',
+          className: 'btn-alert-danger',
+          onClick: () => {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.innerHTML = `
+              <input type="hidden" name="key" value="${ADMIN_KEY}">
+              <input type="hidden" name="action" value="delete_pin">
+              <input type="hidden" name="index" value="${index}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+          }
+        }
+      ]
+    });
+  }
 });
 
 // JSON FILE UPLOAD
@@ -2618,15 +2751,35 @@ if (jsonFileInput) {
     if (this.files.length > 0) {
       const fileName = this.files[0].name;
       if (!fileName.endsWith('.json')) {
-        showAlert('Please select a valid JSON file.', 'Error');
+        showAlert({
+          type: 'error',
+          title: 'Invalid File',
+          message: 'Please select a valid JSON file.'
+        });
         this.value = '';
         return;
       }
-      if (confirm(`Upload "${fileName}" and replace current gates.json?\n\nA backup will be created automatically.`)) {
-        document.getElementById('uploadJsonForm').submit();
-      } else {
-        this.value = '';
-      }
+      showAlert({
+        type: 'warning',
+        title: 'Upload JSON File',
+        message: `Upload "${fileName}" and replace current gates.json?\n\nA backup will be created automatically.`,
+        buttons: [
+          {
+            text: 'No',
+            className: 'btn-alert-secondary',
+            onClick: () => {
+              jsonFileInput.value = '';
+            }
+          },
+          {
+            text: 'Yes',
+            className: 'btn-alert-primary',
+            onClick: () => {
+              document.getElementById('uploadJsonForm').submit();
+            }
+          }
+        ]
+      });
     }
   });
 }
@@ -2796,7 +2949,17 @@ saveAddNewModalBtn.addEventListener('click', () => {
   }
 
   if (!hasCode) {
-    showAlert('Please add at least one code.', 'Error');
+    showAlert({
+      type: 'error',
+      title: 'Error',
+      message: 'Please add at least one code.',
+      buttons: [
+        {
+          text: 'OK',
+          className: 'btn-alert-primary'
+        }
+      ]
+    });
     return;
   }
 
@@ -2814,10 +2977,17 @@ saveAddNewModalBtn.addEventListener('click', () => {
 
     if (duplicates.length > 0) {
       const duplicateList = duplicates.map(c => c.toUpperCase()).join(', ');
-      showAlert(
-        `The following code(s) already exist in "${communityName}": ${duplicateList}`,
-        'Duplicate Code Error'
-      );
+      showAlert({
+        type: 'error',
+        title: 'Duplicate Code Error',
+        message: `The following code(s) already exist in "${communityName}": ${duplicateList}`,
+        buttons: [
+          {
+            text: 'OK',
+            className: 'btn-alert-primary'
+          }
+        ]
+      });
       return;
     }
   }
@@ -2838,6 +3008,772 @@ addNewModal.addEventListener('click', (e) => {
     closeAddNewModal();
   }
 });
-</script>
 
-<?php require_once __DIR__ . '/includes/footer.php'; ?>
+// Delete Community button - NATIVE POPUP
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#deleteEditCommunity')) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const editOriginalName = document.getElementById('editOriginalName');
+    const community = editOriginalName ? editOriginalName.value : '';
+
+    // Create custom confirmation modal
+    const confirmModal = document.createElement('div');
+    confirmModal.id = 'deleteConfirmModal';
+    confirmModal.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20000;
+      padding: 20px;
+    `;
+
+    confirmModal.innerHTML = `
+      <div style="
+        width: min(90vw, 400px);
+        background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+        border: 1px solid var(--modal-border);
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+      ">
+        <div style="
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg style="width: 32px; height: 32px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <h3 style="
+          font-size: 1.25rem;
+          font-weight: 700;
+          margin-bottom: 8px;
+          color: var(--text);
+        ">Delete Community</h3>
+        <p style="
+          font-size: 0.95rem;
+          color: var(--muted);
+          margin-bottom: 24px;
+          line-height: 1.5;
+        ">Are you sure you want to delete "${community}"? This action cannot be undone.</p>
+        <div style="
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        ">
+          <button id="confirmCancel" style="
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 0;
+            background: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
+            border: 1px solid var(--btn-secondary-border);
+          ">Cancel</button>
+          <button id="confirmYes" style="
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 0;
+            background: linear-gradient(135deg, var(--danger), var(--danger-2));
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+          ">Yes, Delete</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(confirmModal);
+    document.body.style.overflow = 'hidden';
+
+    // Get button references
+    const confirmCancelBtn = document.getElementById('confirmCancel');
+    const confirmYesBtn = document.getElementById('confirmYes');
+
+    // Add hover effects to Cancel button
+    confirmCancelBtn.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.background = 'var(--btn-secondary-hover)';
+    });
+    confirmCancelBtn.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.background = 'var(--btn-secondary-bg)';
+    });
+    confirmCancelBtn.addEventListener('mousedown', function() {
+      this.style.transform = 'translateY(0) scale(0.95)';
+    });
+    confirmCancelBtn.addEventListener('mouseup', function() {
+      this.style.transform = 'translateY(-2px) scale(1)';
+    });
+
+    // Add hover effects to Yes button
+    confirmYesBtn.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.boxShadow = '0 6px 18px rgba(255, 92, 92, .6)';
+    });
+    confirmYesBtn.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.boxShadow = '0 4px 14px rgba(255, 92, 92, .4)';
+    });
+    confirmYesBtn.addEventListener('mousedown', function() {
+      this.style.transform = 'translateY(0) scale(0.95)';
+    });
+    confirmYesBtn.addEventListener('mouseup', function() {
+      this.style.transform = 'translateY(-2px) scale(1)';
+    });
+
+    // Cancel button click
+    confirmCancelBtn.addEventListener('click', function() {
+      document.body.removeChild(confirmModal);
+      document.body.style.overflow = '';
+    });
+
+    // Yes button click
+    confirmYesBtn.addEventListener('click', function() {
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.innerHTML = `
+        <input type="hidden" name="key" value="${ADMIN_KEY}">
+        <input type="hidden" name="action" value="delete_comm">
+        <input type="hidden" name="community" value="${community}">
+      `;
+      document.body.appendChild(form);
+      form.submit();
+    });
+
+    // Close on background click
+    confirmModal.addEventListener('click', function(e) {
+      if (e.target === confirmModal) {
+        document.body.removeChild(confirmModal);
+        document.body.style.overflow = '';
+      }
+    });
+  }
+});
+
+// Delete Code button - NATIVE POPUP
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.btn-remove-edit-code')) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const btn = e.target.closest('.btn-remove-edit-code');
+    const editCodeItem = btn.closest('.edit-code-item');
+    const codeInput = editCodeItem.querySelector('input[name*="[code]"]');
+    const codeValue = codeInput ? codeInput.value : 'this code';
+
+    const editOriginalName = document.getElementById('editOriginalName');
+    const community = editOriginalName ? editOriginalName.value : '';
+
+    const editCodesContainer = document.getElementById('editCodesContainer');
+
+    // Check if it's the last code
+    if (editCodesContainer && editCodesContainer.children.length <= 1) {
+      // Create "Cannot Remove" modal
+      const cannotRemoveModal = document.createElement('div');
+      cannotRemoveModal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20000;
+        padding: 20px;
+      `;
+
+      cannotRemoveModal.innerHTML = `
+        <div style="
+          width: min(90vw, 400px);
+          background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+          border: 1px solid var(--modal-border);
+          border-radius: 12px;
+          padding: 24px;
+          text-align: center;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+        ">
+          <div style="
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <svg style="width: 32px; height: 32px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <h3 style="
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+          ">Cannot Remove</h3>
+          <p style="
+            font-size: 0.95rem;
+            color: var(--muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+          ">Cannot remove the last code. A community must have at least one code.</p>
+          <div style="
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+          ">
+            <button id="cannotRemoveOk" style="
+              padding: 12px 24px;
+              border-radius: 10px;
+              font-weight: 600;
+              font-size: 15px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              border: 0;
+              background: linear-gradient(135deg, var(--brand), var(--brand-2));
+              color: #07140c;
+              box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+            ">OK</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(cannotRemoveModal);
+      document.body.style.overflow = 'hidden';
+
+      const cannotRemoveOkBtn = document.getElementById('cannotRemoveOk');
+
+      // Add hover effects to OK button
+      cannotRemoveOkBtn.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 6px 18px rgba(59, 221, 130, .6)';
+      });
+      cannotRemoveOkBtn.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+        this.style.boxShadow = '0 4px 14px rgba(59, 221, 130, .4)';
+      });
+      cannotRemoveOkBtn.addEventListener('mousedown', function() {
+        this.style.transform = 'translateY(0) scale(0.95)';
+      });
+      cannotRemoveOkBtn.addEventListener('mouseup', function() {
+        this.style.transform = 'translateY(-2px) scale(1)';
+      });
+
+      cannotRemoveOkBtn.addEventListener('click', function() {
+        document.body.removeChild(cannotRemoveModal);
+        document.body.style.overflow = '';
+      });
+
+      cannotRemoveModal.addEventListener('click', function(e) {
+        if (e.target === cannotRemoveModal) {
+          document.body.removeChild(cannotRemoveModal);
+          document.body.style.overflow = '';
+        }
+      });
+
+      return;
+    }
+
+    // Create "Delete Code" confirmation modal
+    const deleteCodeModal = document.createElement('div');
+    deleteCodeModal.style.cssText = `
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20000;
+      padding: 20px;
+    `;
+
+    deleteCodeModal.innerHTML = `
+      <div style="
+        width: min(90vw, 400px);
+        background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+        border: 1px solid var(--modal-border);
+        border-radius: 12px;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+      ">
+        <div style="
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg style="width: 32px; height: 32px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <h3 style="
+          font-size: 1.25rem;
+          font-weight: 700;
+          margin-bottom: 8px;
+          color: var(--text);
+        ">Delete Code</h3>
+        <p style="
+          font-size: 0.95rem;
+          color: var(--muted);
+          margin-bottom: 24px;
+          line-height: 1.5;
+        ">Are you sure you want to delete the code "${codeValue}" from ${community}? This action cannot be undone.</p>
+        <div style="
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        ">
+          <button id="deleteCodeCancel" style="
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 0;
+            background: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
+            border: 1px solid var(--btn-secondary-border);
+          ">Cancel</button>
+          <button id="deleteCodeYes" style="
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 0;
+            background: linear-gradient(135deg, var(--danger), var(--danger-2));
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+          ">Yes, Delete</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(deleteCodeModal);
+    document.body.style.overflow = 'hidden';
+
+    // Get button references
+    const cancelBtn = document.getElementById('deleteCodeCancel');
+    const yesBtn = document.getElementById('deleteCodeYes');
+
+    // Add hover effects to Cancel button
+    cancelBtn.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.background = 'var(--btn-secondary-hover)';
+    });
+    cancelBtn.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.background = 'var(--btn-secondary-bg)';
+    });
+    cancelBtn.addEventListener('mousedown', function() {
+      this.style.transform = 'translateY(0) scale(0.95)';
+    });
+    cancelBtn.addEventListener('mouseup', function() {
+      this.style.transform = 'translateY(-2px) scale(1)';
+    });
+
+    // Add hover effects to Yes button
+    yesBtn.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.boxShadow = '0 6px 18px rgba(255, 92, 92, .6)';
+    });
+    yesBtn.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.boxShadow = '0 4px 14px rgba(255, 92, 92, .4)';
+    });
+    yesBtn.addEventListener('mousedown', function() {
+      this.style.transform = 'translateY(0) scale(0.95)';
+    });
+    yesBtn.addEventListener('mouseup', function() {
+      this.style.transform = 'translateY(-2px) scale(1)';
+    });
+
+    // Cancel button click
+    cancelBtn.addEventListener('click', function() {
+      document.body.removeChild(deleteCodeModal);
+      document.body.style.overflow = '';
+    });
+
+    // Yes button
+    document.getElementById('deleteCodeYes').addEventListener('click', async function() {
+      // Close the confirmation modal first
+      document.body.removeChild(deleteCodeModal);
+      document.body.style.overflow = '';
+
+      // Send delete request via fetch
+      const formData = new FormData();
+      formData.append('key', ADMIN_KEY);
+      formData.append('action', 'delete_code');
+      formData.append('community', community);
+      formData.append('code', codeValue);
+
+      try {
+        const response = await fetch('', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          // Remove the code item from the DOM
+          editCodeItem.remove();
+
+          // Show success message (optional - you can remove this if you want)
+          // Create a small success notification
+          const successNotif = document.createElement('div');
+          successNotif.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-2));
+            color: #07140c;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+            z-index: 30000;
+            font-weight: 600;
+            animation: slideIn 0.3s ease;
+          `;
+          successNotif.textContent = 'Code deleted successfully';
+          document.body.appendChild(successNotif);
+
+          setTimeout(() => {
+            successNotif.style.opacity = '0';
+            successNotif.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => document.body.removeChild(successNotif), 300);
+          }, 2000);
+        } else {
+          alert('Error deleting code. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Network error. Please try again.');
+      }
+    });
+
+    // Close on background click
+    deleteCodeModal.addEventListener('click', function(e) {
+      if (e.target === deleteCodeModal) {
+        document.body.removeChild(deleteCodeModal);
+        document.body.style.overflow = '';
+      }
+    });
+  }
+});
+
+// ==================== REPORTED CODES MODAL ====================
+
+window.showReportedCodes = function() {
+  const modal = document.getElementById('reportedCodesModal');
+  const list = document.getElementById('reportedCodesList');
+
+  if (!modal || !list) {
+    console.error('Reported Codes Modal elements not found');
+    return;
+  }
+
+  // Find all reported codes
+  const reportedCodes = [];
+  gatesData.forEach((community, commIdx) => {
+    if (community.codes && Array.isArray(community.codes)) {
+      const totalCodes = community.codes.length;
+      community.codes.forEach((code, codeIdx) => {
+        if (code.report_count && code.report_count > 0) {
+          reportedCodes.push({
+            communityIdx: commIdx,
+            communityName: community.community || '',
+            city: community.city || '',
+            codeIdx: codeIdx,
+            code: code.code || '',
+            notes: code.notes || '',
+            reportCount: code.report_count,
+            totalCodes: totalCodes
+          });
+        }
+      });
+    }
+  });
+
+  // Generate HTML
+  if (reportedCodes.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">✓</div>
+        <p>No hay códigos reportados en este momento.</p>
+      </div>
+    `;
+  } else {
+    let html = '';
+    reportedCodes.forEach(item => {
+      html += `
+        <div style="background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+            <div>
+              <h3 style="margin: 0 0 6px 0; font-size: 1.2rem; color: var(--text);">
+                ${escapeHtml(item.communityName)}
+                ${item.city ? `<span style="color: var(--muted); font-size: 0.95rem; font-weight: 400;"> · ${escapeHtml(item.city)}</span>` : ''}
+              </h3>
+              <p style="margin: 0; color: var(--muted); font-size: 0.95rem;">
+                Código: <strong style="color: var(--text); font-family: monospace; font-size: 1rem;">${escapeHtml(item.code)}</strong>
+                ${item.notes ? `<br><span style="font-size: 0.9rem;">Notas: ${escapeHtml(item.notes)}</span>` : ''}
+              </p>
+            </div>
+            <div style="background: var(--danger); color: white; padding: 6px 14px; border-radius: 14px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+              ${item.reportCount} reporte${item.reportCount > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-primary btn-edit-community-from-reported"
+                    data-community-name="${escapeHtml(item.communityName)}">
+              Editar Comunidad
+            </button>
+            <button class="btn btn-danger btn-delete-code-from-reported"
+                    data-community-name="${escapeHtml(item.communityName)}"
+                    data-code="${escapeHtml(item.code)}"
+                    data-total-codes="${item.totalCodes}">
+              Eliminar Código
+            </button>
+            <button class="btn btn-clear-reports"
+                    data-community-idx="${item.communityIdx}"
+                    data-code-idx="${item.codeIdx}">
+              Limpiar Reportes
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    list.innerHTML = html;
+  }
+
+  // Show modal
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Close button
+document.getElementById('closeReportedModal')?.addEventListener('click', () => {
+  const modal = document.getElementById('reportedCodesModal');
+  if (modal) {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+});
+
+// Close on background click
+document.getElementById('reportedCodesModal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'reportedCodesModal') {
+    e.target.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+});
+
+// Edit Community button
+document.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.btn-edit-community-from-reported');
+  if (editBtn) {
+    const communityName = editBtn.getAttribute('data-community-name');
+
+    // Close reported modal
+    const modal = document.getElementById('reportedCodesModal');
+    if (modal) {
+      modal.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // Open edit modal
+    if (typeof openEditModal === 'function') {
+      openEditModal(communityName);
+    }
+  }
+});
+
+// Delete Code button
+document.addEventListener('click', async (e) => {
+  const deleteBtn = e.target.closest('.btn-delete-code-from-reported');
+  if (deleteBtn) {
+    const communityName = deleteBtn.getAttribute('data-community-name');
+    const code = deleteBtn.getAttribute('data-code');
+    const totalCodes = parseInt(deleteBtn.getAttribute('data-total-codes'));
+
+    // Warning if it's the last code
+    if (totalCodes === 1) {
+      showAlert({
+        type: 'warning',
+        title: 'No se puede eliminar',
+        message: 'No se puede eliminar el último código de una comunidad.\n\nCada comunidad debe tener al menos un código.\n\nSi deseas eliminar esta comunidad completamente, usa el botón "Editar Comunidad" y luego elimina la comunidad desde ahí.',
+        buttons: [
+          {
+            text: 'Entendido',
+            className: 'btn-alert-primary'
+          }
+        ]
+      });
+      return;
+    }
+
+    showAlert({
+      type: 'warning',
+      title: 'Eliminar Código',
+      message: `¿Eliminar el código "${code}" de "${communityName}"?\n\nEsta acción no se puede deshacer.`,
+      buttons: [
+        {
+          text: 'Cancelar',
+          className: 'btn-alert-secondary'
+        },
+        {
+          text: 'Eliminar',
+          className: 'btn-alert-danger',
+          onClick: async () => {
+            try {
+              const formData = new FormData();
+              formData.append('key', '<?= ADMIN_KEY ?>');
+              formData.append('action', 'delete_code');
+              formData.append('community', communityName);
+              formData.append('code', code);
+
+              const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+              });
+
+              const result = await response.json();
+
+              if (response.ok && result.success) {
+                location.reload();
+              } else {
+                showAlert({
+                  type: 'error',
+                  title: 'Error',
+                  message: result.message || 'No se pudo eliminar el código',
+                  buttons: [
+                    {
+                      text: 'OK',
+                      className: 'btn-alert-primary'
+                    }
+                  ]
+                });
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              showAlert({
+                type: 'error',
+                title: 'Error de Conexión',
+                message: 'Error de conexión al eliminar el código',
+                buttons: [
+                  {
+                    text: 'OK',
+                    className: 'btn-alert-primary'
+                  }
+                ]
+              });
+            }
+          }
+        }
+      ]
+    });
+  }
+});
+
+// Clear Reports button
+document.addEventListener('click', async (e) => {
+  const clearBtn = e.target.closest('.btn-clear-reports');
+  if (clearBtn) {
+    const communityIdx = clearBtn.getAttribute('data-community-idx');
+    const codeIdx = clearBtn.getAttribute('data-code-idx');
+
+    showAlert({
+      type: 'warning',
+      title: 'Limpiar Reportes',
+      message: '¿Limpiar todos los reportes de este código?\n\nEl contador de reportes se reiniciará a 0.',
+      buttons: [
+        {
+          text: 'Cancelar',
+          className: 'btn-alert-secondary'
+        },
+        {
+          text: 'Limpiar',
+          className: 'btn-alert-primary',
+          onClick: async () => {
+            try {
+              const formData = new FormData();
+              formData.append('key', '<?= ADMIN_KEY ?>');
+              formData.append('action', 'clear_reports');
+              formData.append('community_idx', communityIdx);
+              formData.append('code_idx', codeIdx);
+
+              const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+              });
+
+              const result = await response.json();
+
+              if (response.ok && result.success) {
+                location.reload();
+              } else {
+                showAlert({
+                  type: 'error',
+                  title: 'Error',
+                  message: result.message || 'No se pudieron limpiar los reportes',
+                  buttons: [
+                    {
+                      text: 'OK',
+                      className: 'btn-alert-primary'
+                    }
+                  ]
+                });
+              }
+            } catch (error) {
+              console.error('Error:', error);
+              showAlert({
+                type: 'error',
+                title: 'Error de Conexión',
+                message: 'Error de conexión al limpiar reportes',
+                buttons: [
+                  {
+                    text: 'OK',
+                    className: 'btn-alert-primary'
+                  }
+                ]
+              });
+            }
+          }
+        }
+      ]
+    });
+  }
+});
+
+</script>

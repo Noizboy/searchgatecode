@@ -6,52 +6,21 @@
                 "code": "#4578",
                 "notes": "Keypad at left lane",
                 "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
-                "photo": "assets/gate_20251003_160316_2a4c80.jpg",
-                "report_count": 2,
-                "last_report_at": "2025-10-11T05:37:24+02:00"
+                "photo": "assets/gate_20251003_160316_2a4c80.jpg"
             },
             {
                 "code": "#4579",
                 "notes": "Back gate (contractors)",
                 "details": "Back entrance used by contractors. Keypad on a short pole; visibility is low at night.",
                 "photo": "assets/gate_20251003_160316_f1466c.jpg"
-            },
-            {
-                "code": "5555",
-                "notes": "55",
-                "details": "555",
-                "photo": "assets/thumbnailnone.png"
             }
         ],
         "city": "Lakeland",
-        "submitted_date": "",
         "coordinates": {
             "latitude": 5555,
             "longitude": -5555
-        }
-    },
-    {
-        "community": "yarey",
-        "codes": [
-            {
-                "code": "2453",
-                "notes": "yarey",
-                "details": "yareyyareyyareyyarey yarey yarey",
-                "photo": "assets/gate-call-box-residential.jpg"
-            },
-            {
-                "code": "#1177*",
-                "notes": "3456456",
-                "details": "54657 fgh fgh",
-                "photo": "assets/gate-call-box-residential.jpg"
-            }
-        ],
-        "city": "",
-        "submitted_date": "",
-        "coordinates": {
-            "latitude": null,
-            "longitude": null
-        }
+        },
+        "http_url": "http://localhost/gatecodes/admin/communities.php?key=43982"
     },
     {
         "community": "santo domingo",
@@ -61,22 +30,8 @@
                 "notes": "main",
                 "details": "ffgh345234",
                 "photo": "assets/gate-call-box-residential.jpg"
-            },
-            {
-                "code": "5555",
-                "notes": "555",
-                "details": "555",
-                "photo": "assets/gate-call-box-residential.jpg"
-            },
-            {
-                "code": "3456456",
-                "notes": "34564564",
-                "details": "34564564",
-                "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -105,12 +60,9 @@
             {
                 "code": "1925#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -242,7 +194,9 @@
                 "code": "2525#",
                 "notes": "Main entrance",
                 "details": "",
-                "photo": "assets/gate-call-box-residential.jpg"
+                "photo": "assets/gate-call-box-residential.jpg",
+                "report_count": 1,
+                "last_report_at": "2025-10-13T17:58:07+02:00"
             }
         ],
         "city": "",
@@ -496,20 +450,18 @@
             {
                 "code": "35634",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/thumbnailnone.png"
             },
             {
-                "code": "nuevonuevo",
+                "code": "34534534",
                 "notes": "nuevonuevo",
                 "details": "nuevonuevo",
                 "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg"
             }
         ],
         "city": "nuevonuevo",
-        "submitted_date": "2025-10-09 22:28:52",
         "coordinates": {
-            "latitude": 28.3217198,
+            "latitude": -28.3217198,
             "longitude": -81.38180539999999
         }
     },
@@ -663,7 +615,9 @@
                 "code": "Testeando",
                 "notes": "Testeando",
                 "details": "Testeando",
-                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg"
+                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg",
+                "report_count": 2,
+                "last_report_at": "2025-10-13T07:25:00+02:00"
             }
         ],
         "city": "Testeando",

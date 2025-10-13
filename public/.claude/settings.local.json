@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:\\xampp\\php\\php.exe -l:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

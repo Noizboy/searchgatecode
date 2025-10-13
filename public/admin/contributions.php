@@ -670,9 +670,196 @@ require_once __DIR__ . '/includes/header.php';
     padding: 16px;
   }
 }
+
+/* Alert Modal */
+.alert-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.alert-backdrop.open {
+  display: flex;
+  opacity: 1;
+}
+
+.alert-modal {
+  background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+  border: 1px solid var(--modal-border);
+  border-radius: 12px;
+  padding: 24px;
+  width: min(90vw, 400px);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+
+.alert-modal .alert-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-modal .alert-icon.success {
+  background: linear-gradient(135deg, rgba(59, 221, 130, 0.2), rgba(27, 191, 103, 0.15));
+}
+
+.alert-modal .alert-icon.error {
+  background: linear-gradient(135deg, rgba(255, 92, 92, 0.2), rgba(229, 57, 53, 0.15));
+}
+
+.alert-modal .alert-icon.warning {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
+}
+
+.alert-modal .alert-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.alert-modal .alert-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.alert-modal .alert-message {
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.alert-modal .alert-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.alert-modal .btn-alert {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 0;
+}
+
+.alert-modal .btn-alert-primary {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #07140c;
+  box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+}
+
+.alert-modal .btn-alert-primary:hover {
+  box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+  transform: translateY(-1px);
+}
+
+.alert-modal .btn-alert-danger {
+  background: linear-gradient(135deg, var(--danger), var(--danger-2));
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+}
+
+.alert-modal .btn-alert-danger:hover {
+  box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+  transform: translateY(-1px);
+}
+
+.alert-modal .btn-alert-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+}
+
+.alert-modal .btn-alert-secondary:hover {
+  background: var(--btn-secondary-hover);
+}
 </style>
 
+<!-- Alert Modal -->
+<div id="alertBackdrop" class="alert-backdrop" aria-hidden="true">
+  <div class="alert-modal" role="alertdialog" aria-modal="true">
+    <div id="alertIcon" class="alert-icon"></div>
+    <div id="alertTitle" class="alert-title"></div>
+    <div id="alertMessage" class="alert-message"></div>
+    <div id="alertActions" class="alert-actions"></div>
+  </div>
+</div>
+
 <script>
+// Alert Modal Functions
+const alertBackdrop = document.getElementById('alertBackdrop');
+const alertIcon = document.getElementById('alertIcon');
+const alertTitle = document.getElementById('alertTitle');
+const alertMessage = document.getElementById('alertMessage');
+const alertActions = document.getElementById('alertActions');
+
+function showAlert({ type = 'warning', title, message, buttons = [] }) {
+  const icons = {
+    success: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3bdd82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>`,
+    error: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="15" y1="9" x2="9" y2="15"></line>
+      <line x1="9" y1="9" x2="15" y2="15"></line>
+    </svg>`,
+    warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`
+  };
+
+  alertIcon.innerHTML = icons[type] || icons.warning;
+  alertIcon.className = `alert-icon ${type}`;
+  alertTitle.textContent = title;
+  alertMessage.textContent = message;
+
+  alertActions.innerHTML = '';
+  buttons.forEach(btn => {
+    const button = document.createElement('button');
+    button.className = `btn-alert ${btn.className || 'btn-alert-secondary'}`;
+    button.textContent = btn.text;
+    button.onclick = () => {
+      closeAlert();
+      if (btn.onClick) btn.onClick();
+    };
+    alertActions.appendChild(button);
+  });
+
+  alertBackdrop.classList.add('open');
+  alertBackdrop.setAttribute('aria-hidden', 'false');
+}
+
+function closeAlert() {
+  alertBackdrop.classList.remove('open');
+  alertBackdrop.setAttribute('aria-hidden', 'true');
+}
+
+alertBackdrop.addEventListener('click', (e) => {
+  if (e.target === alertBackdrop) closeAlert();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && alertBackdrop.classList.contains('open')) closeAlert();
+});
+
 const suggestions = <?= json_encode($suggestions) ?>;
 let currentIndex = -1;
 let editCodeCounter = 0;
@@ -778,48 +965,88 @@ document.getElementById('closeModal').addEventListener('click', () => {
 
 // Reject button
 document.getElementById('rejectBtn').addEventListener('click', () => {
-  if (confirm('Are you sure you want to reject this contribution? This will delete all associated images.')) {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.innerHTML = `
-      <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
-      <input type="hidden" name="action" value="reject_contribution">
-      <input type="hidden" name="index" value="${currentIndex}">
-    `;
-    document.body.appendChild(form);
-    form.submit();
-  }
+  showAlert({
+    type: 'warning',
+    title: 'Reject Contribution',
+    message: 'Are you sure you want to reject this contribution? This will delete all associated images and cannot be undone.',
+    buttons: [
+      {
+        text: 'No',
+        className: 'btn-alert-secondary'
+      },
+      {
+        text: 'Yes',
+        className: 'btn-alert-danger',
+        onClick: () => {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.innerHTML = `
+            <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+            <input type="hidden" name="action" value="reject_contribution">
+            <input type="hidden" name="index" value="${currentIndex}">
+          `;
+          document.body.appendChild(form);
+          form.submit();
+        }
+      }
+    ]
+  });
 });
 
 // Approve button - First saves changes, then approves
 document.getElementById('approveBtn').addEventListener('click', (e) => {
   e.preventDefault();
 
-  if (confirm('Save changes and approve this contribution?')) {
-    const mainForm = document.getElementById('editContributionForm');
+  showAlert({
+    type: 'success',
+    title: 'Approve Contribution',
+    message: 'Save changes and approve this contribution? This will add it to the main database.',
+    buttons: [
+      {
+        text: 'No',
+        className: 'btn-alert-secondary'
+      },
+      {
+        text: 'Yes',
+        className: 'btn-alert-primary',
+        onClick: () => {
+          const mainForm = document.getElementById('editContributionForm');
 
-    // First save the changes (update_contribution)
-    const formData = new FormData(mainForm);
+          // First save the changes (update_contribution)
+          const formData = new FormData(mainForm);
 
-    fetch('', {
-      method: 'POST',
-      body: formData
-    }).then(() => {
-      // After saving, approve the contribution
-      const approveForm = document.createElement('form');
-      approveForm.method = 'POST';
-      approveForm.innerHTML = `
-        <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
-        <input type="hidden" name="action" value="approve_contribution">
-        <input type="hidden" name="index" value="${currentIndex}">
-      `;
-      document.body.appendChild(approveForm);
-      approveForm.submit();
-    }).catch(err => {
-      console.error('Error saving changes:', err);
-      alert('Error saving changes. Please try again.');
-    });
-  }
+          fetch('', {
+            method: 'POST',
+            body: formData
+          }).then(() => {
+            // After saving, approve the contribution
+            const approveForm = document.createElement('form');
+            approveForm.method = 'POST';
+            approveForm.innerHTML = `
+              <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
+              <input type="hidden" name="action" value="approve_contribution">
+              <input type="hidden" name="index" value="${currentIndex}">
+            `;
+            document.body.appendChild(approveForm);
+            approveForm.submit();
+          }).catch(err => {
+            console.error('Error saving changes:', err);
+            showAlert({
+              type: 'error',
+              title: 'Error',
+              message: 'Error saving changes. Please try again.',
+              buttons: [
+                {
+                  text: 'OK',
+                  className: 'btn-alert-primary'
+                }
+              ]
+            });
+          });
+        }
+      }
+    ]
+  });
 });
 
 // Helper functions

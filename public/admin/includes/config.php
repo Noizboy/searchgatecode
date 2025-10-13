@@ -1,6 +1,7 @@
 <?php
 /******************** CONFIG ********************/
 const ADMIN_KEY   = '43982';
+const APP_VERSION = '1.0.0';
 const GATES_JSON  = __DIR__ . '/../../data/gates.json';
 const SUGGEST_JSON = __DIR__ . '/../../data/suggest.json';
 const PIN_JSON = __DIR__ . '/../../data/pin.json';

@@ -4,18 +4,10 @@
 <!-- ALERT MODAL -->
 <div id="alertModal" class="alert-modal">
   <div class="alert-modal-content">
-    <div class="alert-modal-icon" id="alertModalIcon">
-      <svg class="alert-icon-svg" fill="currentColor" viewBox="0 0 20 20">
-        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-      </svg>
-    </div>
-    <div class="alert-modal-body">
-      <h3 class="alert-modal-title" id="alertModalTitle">Notification</h3>
-      <p class="alert-modal-message" id="alertModalMessage"></p>
-    </div>
-    <div class="alert-modal-footer">
-      <button class="btn btn-primary" id="alertModalOk">OK</button>
-    </div>
+    <div id="alertModalIcon" class="alert-modal-icon"></div>
+    <div id="alertModalTitle" class="alert-modal-title"></div>
+    <div id="alertModalMessage" class="alert-modal-message"></div>
+    <div id="alertModalActions" class="alert-modal-actions"></div>
   </div>
 </div>
 
@@ -24,13 +16,55 @@ const ADMIN_KEY = "<?= htmlspecialchars(ADMIN_KEY) ?>";
 
 // ALERT MODAL
 const alertModal = document.getElementById('alertModal');
+const alertModalIcon = document.getElementById('alertModalIcon');
 const alertModalTitle = document.getElementById('alertModalTitle');
 const alertModalMessage = document.getElementById('alertModalMessage');
-const alertModalOk = document.getElementById('alertModalOk');
+const alertModalActions = document.getElementById('alertModalActions');
 
-function showAlert(message, title = 'Notification') {
+function showAlert({ type = 'warning', title, message, buttons = [] }) {
+  const icons = {
+    success: `<svg class="alert-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3bdd82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>`,
+    error: `<svg class="alert-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="15" y1="9" x2="9" y2="15"></line>
+      <line x1="9" y1="9" x2="15" y2="15"></line>
+    </svg>`,
+    warning: `<svg class="alert-icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`
+  };
+
+  alertModalIcon.innerHTML = icons[type] || icons.warning;
+  alertModalIcon.className = `alert-modal-icon ${type}`;
   alertModalTitle.textContent = title;
   alertModalMessage.textContent = message;
+
+  alertModalActions.innerHTML = '';
+
+  // If no buttons provided, add a default OK button
+  if (buttons.length === 0) {
+    buttons = [{
+      text: 'OK',
+      className: 'btn-alert-primary'
+    }];
+  }
+
+  buttons.forEach(btn => {
+    const button = document.createElement('button');
+    button.className = `btn-alert ${btn.className || 'btn-alert-secondary'}`;
+    button.textContent = btn.text;
+    button.onclick = () => {
+      closeAlert();
+      if (btn.onClick) btn.onClick();
+    };
+    alertModalActions.appendChild(button);
+  });
+
   alertModal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -39,8 +73,6 @@ function closeAlert() {
   alertModal.classList.remove('open');
   document.body.style.overflow = '';
 }
-
-alertModalOk.addEventListener('click', closeAlert);
 
 alertModal.addEventListener('click', (e) => {
   if (e.target === alertModal) {
@@ -54,12 +86,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Show flash message on load
+// Show flash message on load (backward compatibility)
 const flashMessage = document.getElementById('flashMessage');
 if (flashMessage) {
   const message = flashMessage.getAttribute('data-message');
   if (message) {
-    setTimeout(() => showAlert(message), 100);
+    setTimeout(() => showAlert({
+      type: 'success',
+      title: 'Success',
+      message: message
+    }), 100);
   }
 }
 
@@ -137,7 +173,7 @@ if (mobileMenuToggle && sidebar) {
 ">
   © <span id="currentYear"></span> Built by <a href="mailto:blancuniverse@gmail.com" style="color: var(--brand); text-decoration: none; font-weight: 600; transition: color 0.2s ease;">Alejandro</a>
   <span style="margin: 0 8px; opacity: 0.5;">•</span>
-  <span style="font-family: 'Courier New', monospace; color: var(--brand); font-weight: 600;">Build v1.0.0</span>
+  <span style="font-family: 'Courier New', monospace; color: var(--brand); font-weight: 600;">Build v<?= APP_VERSION ?></span>
 </footer>
 
 <script>

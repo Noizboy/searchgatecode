@@ -209,9 +209,26 @@ jsonFileInput.addEventListener('change', (e) => {
 });
 
 uploadForm.addEventListener('submit', (e) => {
-  if (!confirm('Are you sure you want to replace the current data? A backup will be created.')) {
-    e.preventDefault();
-  }
+  e.preventDefault();
+
+  showAlert({
+    type: 'warning',
+    title: 'Replace Data',
+    message: 'Are you sure you want to replace the current data? A backup will be created automatically.',
+    buttons: [
+      {
+        text: 'No',
+        className: 'btn-alert-secondary'
+      },
+      {
+        text: 'Yes',
+        className: 'btn-alert-primary',
+        onClick: () => {
+          uploadForm.submit();
+        }
+      }
+    ]
+  });
 });
 
 // Show flash messages

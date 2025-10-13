@@ -227,12 +227,93 @@
   .btn-report:hover{box-shadow:0 6px 16px rgba(255,92,92,.5)}
   .btn-report:active{transform:translateY(1px)}
 
+  .btn-open-gate{
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    color:#07140c;font-weight:600;border:0;
+    padding:8px 12px;border-radius:10px;cursor:pointer;
+    box-shadow:0 4px 12px rgba(59,221,130,.35);
+    transition:transform .1s ease, box-shadow .2s ease;
+    font-size:14px;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .btn-open-gate:hover{box-shadow:0 6px 16px rgba(59,221,130,.5)}
+  .btn-open-gate:active{transform:translateY(1px)}
+  .btn-open-gate svg{width:14px;height:14px;}
+
   .empty,.hint{
     color:var(--muted);
     margin-top:10px;
     font-size:14px;
   }
-  
+
+  /* GPS Button */
+  .gps-btn {
+    margin: 80px auto;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    border: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(59, 221, 130, .4);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .gps-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 12px 32px rgba(59, 221, 130, .6);
+  }
+
+  .gps-btn:active {
+    transform: scale(0.98);
+  }
+
+  .gps-btn.searching {
+    animation: gps-pulse 1.5s ease-in-out infinite;
+  }
+
+  .gps-btn.hidden {
+    display: none;
+  }
+
+  .gps-btn .gps-icon {
+    color: #07140c;
+    transition: transform 0.3s ease;
+  }
+
+  .gps-btn.searching .gps-icon {
+    animation: gps-bounce 1s ease-in-out infinite;
+  }
+
+  @keyframes gps-pulse {
+    0%, 100% {
+      box-shadow: 0 8px 24px rgba(59, 221, 130, .4);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 12px 40px rgba(59, 221, 130, .8);
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes gps-bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
   /* Footer */
   footer{
     padding:16px;
@@ -286,6 +367,106 @@
   }
   .modal-note{ color:var(--text); font-size:14px; line-height:1.45; padding:12px 16px 6px 16px }
   .modal-meta{ color:var(--muted); font-size:13px; padding:0 16px 14px 16px }
+
+  /* Alert Modal */
+  .alert-modal {
+    background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+    border: 1px solid var(--modal-border);
+    border-radius: 12px;
+    padding: 24px;
+    width: min(90vw, 400px);
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+
+  .alert-modal .alert-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .alert-modal .alert-icon.success {
+    background: linear-gradient(135deg, rgba(59, 221, 130, 0.2), rgba(27, 191, 103, 0.15));
+  }
+
+  .alert-modal .alert-icon.error {
+    background: linear-gradient(135deg, rgba(255, 92, 92, 0.2), rgba(229, 57, 53, 0.15));
+  }
+
+  .alert-modal .alert-icon.warning {
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(245, 124, 0, 0.15));
+  }
+
+  .alert-modal .alert-icon svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .alert-modal .alert-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .alert-modal .alert-message {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .alert-modal .alert-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .alert-modal .btn-alert {
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 0;
+  }
+
+  .alert-modal .btn-alert-primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: #07140c;
+    box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+  }
+
+  .alert-modal .btn-alert-primary:hover {
+    box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+    transform: translateY(-1px);
+  }
+
+  .alert-modal .btn-alert-danger {
+    background: linear-gradient(135deg, var(--danger), var(--danger-2));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(255, 92, 92, .4);
+  }
+
+  .alert-modal .btn-alert-danger:hover {
+    box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
+    transform: translateY(-1px);
+  }
+
+  .alert-modal .btn-alert-secondary {
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    border: 1px solid var(--btn-secondary-border);
+  }
+
+  .alert-modal .btn-alert-secondary:hover {
+    background: var(--btn-secondary-hover);
+  }
 
   /* Theme Toggle Button */
   .theme-toggle {
@@ -366,6 +547,14 @@
 
     <div id="msg" class="hint">Type a community name and press Search.</div>
 
+    <!-- GPS Location Button -->
+    <button id="gpsBtn" class="gps-btn" type="button" title="Find communities near me" aria-label="Find communities near me">
+      <svg class="gps-icon" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    </button>
+
     <div class="results-container">
       <div id="results" class="grid"></div>
     </div>
@@ -388,6 +577,16 @@
         <div id="modalText" class="modal-note"></div>
         <div id="modalMeta" class="modal-meta"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Alert Modal -->
+  <div id="alertBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="alert-modal" role="alertdialog" aria-modal="true">
+      <div id="alertIcon" class="alert-icon"></div>
+      <div id="alertTitle" class="alert-title"></div>
+      <div id="alertMessage" class="alert-message"></div>
+      <div id="alertActions" class="alert-actions"></div>
     </div>
   </div>
 
@@ -416,12 +615,19 @@ function renderNone(q){
   const res = document.getElementById('results');
   res.innerHTML = '';
   const msg = document.getElementById('msg');
+  msg.style.color = 'var(--muted)';
   if(!q){
     msg.textContent = 'Type a community name and press Search.';
   } else {
     msg.textContent = `No results for "${q}".`;
   }
   msg.style.display = 'block';
+
+  // Show GPS button when no results
+  const gpsBtn = document.getElementById('gpsBtn');
+  if (gpsBtn) {
+    gpsBtn.classList.remove('hidden');
+  }
 }
 
 function renderResults(items){
@@ -431,7 +637,10 @@ function renderResults(items){
   res.innerHTML = items.map(it => `
     <section class="item">
       <div class="item-head">
-        <div class="community">${escapeHtml(it.community)}</div>
+        <div class="community">
+          ${escapeHtml(it.community)}
+          ${it.city ? `<span style="color: var(--muted); font-weight: 500;"> - ${escapeHtml(it.city)}</span>` : ''}
+        </div>
       </div>
       <div class="codes">
         ${it.codes.map(c => `
@@ -444,6 +653,13 @@ function renderResults(items){
               ${c.notes ? `<div class="note">${escapeHtml(c.notes)}</div>` : ``}
             </div>
             <div class="actions">
+              ${it.http_url ? `<button class="btn-open-gate" data-url="${escapeHtml(it.http_url)}" title="Open gate via HTTP">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Open
+              </button>` : ''}
               <button class="btn-secondary btn-details"
                 data-community="${escapeHtml(it.community)}"
                 data-code="${escapeHtml(c.code)}"
@@ -470,55 +686,167 @@ function renderResults(items){
     });
   });
 
+  res.querySelectorAll('.btn-open-gate').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const url = btn.getAttribute('data-url');
+      if (!url) return;
+
+      // Disable button and show loading state
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 6v6l4 2"></path>
+      </svg>
+      Opening...`;
+
+      try {
+        // Make HTTP request to the URL
+        const response = await fetch(url, {
+          method: 'GET',
+          mode: 'no-cors' // Allow requests to devices without CORS
+        });
+
+        // Show success alert
+        showAlert({
+          type: 'success',
+          title: 'Gate Command Sent',
+          message: 'The gate opening command has been sent successfully.',
+          buttons: [
+            {
+              text: 'OK',
+              className: 'btn-alert-primary'
+            }
+          ]
+        });
+
+        // Reset button after success
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+
+      } catch (error) {
+        console.error('Error opening gate:', error);
+
+        // Show error alert
+        showAlert({
+          type: 'error',
+          title: 'Failed to Open Gate',
+          message: 'Could not send the opening command. Please check your connection or try again.',
+          buttons: [
+            {
+              text: 'OK',
+              className: 'btn-alert-secondary'
+            }
+          ]
+        });
+
+        // Reset button after error
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    });
+  });
+
   res.querySelectorAll('.btn-report').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const comm = btn.getAttribute('data-community');
       const code = btn.getAttribute('data-code');
 
-      // Disable button to prevent double-clicks
-      btn.disabled = true;
-      btn.textContent = 'Reporting...';
-
-      try {
-        const response = await fetch('report_gate.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+      // Show confirmation alert
+      showAlert({
+        type: 'warning',
+        title: 'Report Gate Code',
+        message: `Are you sure you want to report the code "${code}" from ${comm}? This will help us identify potentially incorrect or outdated codes.`,
+        buttons: [
+          {
+            text: 'Cancel',
+            className: 'btn-alert-secondary'
           },
-          body: JSON.stringify({
-            community: comm,
-            code: code
-          })
-        });
+          {
+            text: 'Yes, Report',
+            className: 'btn-alert-danger',
+            onClick: async () => {
+              // Disable button to prevent double-clicks
+              const originalText = btn.textContent;
+              btn.disabled = true;
+              btn.textContent = 'Reporting...';
 
-        const result = await response.json();
+              try {
+                const response = await fetch('report_gate.php', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    community: comm,
+                    code: code
+                  })
+                });
 
-        if (result.success) {
-          // Update local DATA
-          const community = DATA.find(x => x.community === comm);
-          if (community) {
-            const codeObj = community.codes.find(c => c.code === code);
-            if (codeObj) {
-              codeObj.report_count = (codeObj.report_count || 0) + 1;
+                const result = await response.json();
+
+                if (result.success) {
+                  // Update local DATA
+                  const community = DATA.find(x => x.community === comm);
+                  if (community) {
+                    const codeObj = community.codes.find(c => c.code === code);
+                    if (codeObj) {
+                      codeObj.report_count = (codeObj.report_count || 0) + 1;
+                    }
+                  }
+
+                  // Re-render results to show updated badge
+                  const q = document.getElementById('q').value.trim();
+                  search(q);
+
+                  // Show success message
+                  showAlert({
+                    type: 'success',
+                    title: 'Report Submitted',
+                    message: `Thank you for reporting the code "${code}" from ${comm}. Your feedback helps keep our database accurate and up-to-date.`,
+                    buttons: [
+                      {
+                        text: 'Close',
+                        className: 'btn-alert-primary'
+                      }
+                    ]
+                  });
+                } else {
+                  // Show error message
+                  showAlert({
+                    type: 'error',
+                    title: 'Report Failed',
+                    message: result.message || 'Failed to submit report. Please try again.',
+                    buttons: [
+                      {
+                        text: 'Close',
+                        className: 'btn-alert-secondary'
+                      }
+                    ]
+                  });
+                  btn.disabled = false;
+                  btn.textContent = originalText;
+                }
+              } catch (error) {
+                console.error('Error reporting gate:', error);
+                showAlert({
+                  type: 'error',
+                  title: 'Connection Error',
+                  message: 'Failed to submit report. Please check your connection and try again.',
+                  buttons: [
+                    {
+                      text: 'Close',
+                      className: 'btn-alert-secondary'
+                    }
+                  ]
+                });
+                btn.disabled = false;
+                btn.textContent = originalText;
+              }
             }
           }
-
-          // Re-render results to show updated badge
-          const q = document.getElementById('q').value.trim();
-          search(q);
-
-          alert(`Report submitted for ${code} from ${comm}`);
-        } else {
-          alert(`Error: ${result.message}`);
-          btn.disabled = false;
-          btn.textContent = 'Report';
-        }
-      } catch (error) {
-        console.error('Error reporting gate:', error);
-        alert('Failed to submit report. Please try again.');
-        btn.disabled = false;
-        btn.textContent = 'Report';
-      }
+        ]
+      });
     });
   });
 }
@@ -528,6 +856,11 @@ function search(q){
   const hits = DATA.filter(x => norm(x.community).includes(qn));
   if(hits.length === 0){ renderNone(q); return; }
   renderResults(hits);
+  // Hide GPS button when search results are shown
+  const gpsBtn = document.getElementById('gpsBtn');
+  if (gpsBtn) {
+    gpsBtn.classList.add('hidden');
+  }
 }
 
 function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]); }
@@ -586,6 +919,67 @@ modalClose.addEventListener('click', closeModal);
 backdrop.addEventListener('click', (e)=> { if(e.target === backdrop) closeModal(); });
 window.addEventListener('keydown', (e)=> { if(e.key === 'Escape' && backdrop.classList.contains('open')) closeModal(); });
 
+// Alert Modal Functions
+const alertBackdrop = document.getElementById('alertBackdrop');
+const alertIcon = document.getElementById('alertIcon');
+const alertTitle = document.getElementById('alertTitle');
+const alertMessage = document.getElementById('alertMessage');
+const alertActions = document.getElementById('alertActions');
+
+function showAlert({ type = 'warning', title, message, buttons = [] }) {
+  // Set icon based on type
+  const icons = {
+    success: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3bdd82" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>`,
+    error: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="15" y1="9" x2="9" y2="15"></line>
+      <line x1="9" y1="9" x2="15" y2="15"></line>
+    </svg>`,
+    warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>`
+  };
+
+  alertIcon.innerHTML = icons[type] || icons.warning;
+  alertIcon.className = `alert-icon ${type}`;
+  alertTitle.textContent = title;
+  alertMessage.textContent = message;
+
+  // Clear and add buttons
+  alertActions.innerHTML = '';
+  buttons.forEach(btn => {
+    const button = document.createElement('button');
+    button.className = `btn-alert ${btn.className || 'btn-alert-secondary'}`;
+    button.textContent = btn.text;
+    button.onclick = () => {
+      closeAlert();
+      if (btn.onClick) btn.onClick();
+    };
+    alertActions.appendChild(button);
+  });
+
+  alertBackdrop.classList.add('open');
+  alertBackdrop.setAttribute('aria-hidden', 'false');
+}
+
+function closeAlert() {
+  alertBackdrop.classList.remove('open');
+  alertBackdrop.setAttribute('aria-hidden', 'true');
+}
+
+alertBackdrop.addEventListener('click', (e) => {
+  if (e.target === alertBackdrop) closeAlert();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && alertBackdrop.classList.contains('open')) closeAlert();
+});
+
 // Theme Toggle Functionality
 const themeToggle = document.getElementById('themeToggle');
 const moonIcon = document.getElementById('moonIcon');
@@ -619,6 +1013,142 @@ themeToggle.addEventListener('click', () => {
     sunIcon.style.display = 'block';
   }
 });
+
+// GPS Location functionality
+const gpsBtn = document.getElementById('gpsBtn');
+const msgElement = document.getElementById('msg');
+
+// Function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  return distance; // Distance in kilometers
+}
+
+// GPS button click handler
+gpsBtn.addEventListener('click', async () => {
+  // Check if geolocation is supported
+  if (!navigator.geolocation) {
+    msgElement.textContent = 'Geolocation is not supported by your browser.';
+    msgElement.style.color = 'var(--danger)';
+    return;
+  }
+
+  // Load data if not already loaded
+  if (!DATA.length) await loadData();
+
+  // Add searching animation
+  gpsBtn.classList.add('searching');
+  gpsBtn.disabled = true;
+  msgElement.textContent = 'Searching for communities nearby...';
+  msgElement.style.color = 'var(--brand)';
+
+  // Get user's location
+  navigator.geolocation.getCurrentPosition(
+    // Success callback
+    (position) => {
+      const userLat = position.coords.latitude;
+      const userLon = position.coords.longitude;
+      const searchRadius = 0.03; // Search radius in kilometers (30 meters)
+
+      // Find communities within radius
+      const nearbyCommunities = DATA.filter(community => {
+        if (!community.coordinates ||
+            community.coordinates.latitude === null ||
+            community.coordinates.longitude === null) {
+          return false;
+        }
+
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          community.coordinates.latitude,
+          community.coordinates.longitude
+        );
+
+        return distance <= searchRadius;
+      });
+
+      // Remove searching animation
+      gpsBtn.classList.remove('searching');
+      gpsBtn.disabled = false;
+
+      if (nearbyCommunities.length > 0) {
+        // Sort by distance (closest first)
+        nearbyCommunities.sort((a, b) => {
+          const distA = calculateDistance(userLat, userLon, a.coordinates.latitude, a.coordinates.longitude);
+          const distB = calculateDistance(userLat, userLon, b.coordinates.latitude, b.coordinates.longitude);
+          return distA - distB;
+        });
+
+        // Show results
+        renderResults(nearbyCommunities);
+
+        // Hide GPS button after successful search
+        gpsBtn.classList.add('hidden');
+
+        // Update message
+        const count = nearbyCommunities.length;
+        const closest = nearbyCommunities[0];
+        const closestDistanceKm = calculateDistance(
+          userLat, userLon,
+          closest.coordinates.latitude,
+          closest.coordinates.longitude
+        );
+
+        // Show distance in meters
+        const closestDistanceMeters = Math.round(closestDistanceKm * 1000);
+        const distanceText = `${closestDistanceMeters} meters away`;
+
+        msgElement.textContent = `Found ${count} ${count === 1 ? 'community' : 'communities'} near you. Closest: ${closest.community} (${distanceText})`;
+        msgElement.style.color = 'var(--brand)';
+      } else {
+        // No communities found
+        renderNone('');
+        msgElement.textContent = 'No communities found within 30 meters of your location.';
+        msgElement.style.color = 'var(--muted)';
+      }
+    },
+    // Error callback
+    (error) => {
+      gpsBtn.classList.remove('searching');
+      gpsBtn.disabled = false;
+
+      let errorMessage = 'Unable to get your location. ';
+
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          errorMessage += 'Please allow location access to find nearby communities.';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMessage += 'Location information is unavailable.';
+          break;
+        case error.TIMEOUT:
+          errorMessage += 'Location request timed out.';
+          break;
+        default:
+          errorMessage += 'An unknown error occurred.';
+      }
+
+      msgElement.textContent = errorMessage;
+      msgElement.style.color = 'var(--danger)';
+    },
+    // Options
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+});
+
 
 loadData();
 </script>
