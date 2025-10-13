@@ -115,8 +115,19 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- ADD NEW PAGE CONTENT -->
 <div class="page-header">
-  <h1 class="page-title">Add New Community</h1>
-  <p class="page-subtitle">Add a new community with gate codes</p>
+  <div class="page-header-left">
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="page-header-content">
+      <h1 class="page-title">Add New Community</h1>
+      <p class="page-subtitle">Add a new community with gate codes</p>
+    </div>
+  </div>
 </div>
 
 <div class="add-new-container">
@@ -154,24 +165,6 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <style>
-.page-header {
-  flex-shrink: 0;
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text);
-  margin: 0 0 8px 0;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  color: var(--muted);
-  margin: 0;
-}
-
 /* ADD NEW CONTAINER */
 .add-new-container {
   display: flex;
@@ -286,6 +279,21 @@ require_once __DIR__ . '/includes/header.php';
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+@media (max-width: 768px) {
+  .code-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+}
 </style>
 
 <script>
@@ -322,7 +330,14 @@ function createCodeRow(index) {
       <div class="upload-status" id="status-${index}"></div>
     </div>
     <div class="full-width">
-      <button type="button" class="btn btn-danger btn-remove-code">Remove Code</button>
+      <button type="button" class="btn btn-danger btn-remove-code" title="Remove Code">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
     </div>
   `;
   return div;

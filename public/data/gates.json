@@ -1,24 +1,14 @@
 [
     {
-        "community": "Water Oaks 22",
-        "codes": [
-            {
-                "code": "#54839",
-                "notes": "Main entrance keypad",
-                "details": "Keypad on the left pillar after the visitor lane. Gate closes fast; keep the van close.",
-                "photo": "assets/gate-call-box-residential.jpg"
-            }
-        ],
-        "city": "Lakeland"
-    },
-    {
         "community": "Maple Ridge",
         "codes": [
             {
                 "code": "#4578",
                 "notes": "Keypad at left lane",
                 "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
-                "photo": "assets/gate_20251003_160316_2a4c80.jpg"
+                "photo": "assets/gate_20251003_160316_2a4c80.jpg",
+                "report_count": 2,
+                "last_report_at": "2025-10-11T05:37:24+02:00"
             },
             {
                 "code": "#4579",
@@ -33,7 +23,12 @@
                 "photo": "assets/thumbnailnone.png"
             }
         ],
-        "city": "Lakeland"
+        "city": "Lakeland",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": 5555,
+            "longitude": -5555
+        }
     },
     {
         "community": "yarey",
@@ -50,7 +45,13 @@
                 "details": "54657 fgh fgh",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "santo domingo",
@@ -73,7 +74,13 @@
                 "details": "34564564",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Enclave at harden - Lakeland",
@@ -81,9 +88,16 @@
             {
                 "code": "*1143",
                 "notes": "Main Gate",
+                "details": "",
                 "photo": "assets/gate_20251001_114322_1e545c.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Cordgrass",
@@ -94,7 +108,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Silver Dr (Merganser)",
@@ -105,7 +125,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Evergreen",
@@ -116,7 +142,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Royal Reserve",
@@ -127,7 +159,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Heritage",
@@ -138,7 +176,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Hickory Leaf",
@@ -149,7 +193,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Indian Sky Creek",
@@ -160,7 +210,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Highland in the Woods",
@@ -171,7 +227,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Highland Oak",
@@ -182,7 +244,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Silver Leaf W",
@@ -193,7 +261,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Highland in the Wood St",
@@ -204,7 +278,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Christina Chase",
@@ -215,7 +295,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Ashton Woods",
@@ -226,7 +312,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Aston Oak",
@@ -237,7 +329,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Cresen Wood",
@@ -248,7 +346,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Millbroke/Millbrook",
@@ -259,7 +363,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Cresen/Crescent Hills",
@@ -270,7 +380,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Cresen/Crescent Oaks",
@@ -281,7 +397,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Tiffany Oak",
@@ -292,7 +414,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Amanda Oaks",
@@ -303,7 +431,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Christina Lake",
@@ -314,7 +448,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Lake Clark",
@@ -325,7 +465,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Gandhi Dr",
@@ -336,7 +482,13 @@
                 "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "nuevonuevo",
@@ -344,21 +496,22 @@
             {
                 "code": "35634",
                 "notes": "Main entrance",
+                "details": "",
                 "photo": "assets/thumbnailnone.png"
             },
             {
                 "code": "nuevonuevo",
                 "notes": "nuevonuevo",
                 "details": "nuevonuevo",
-                "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg",
-                "coordinates": {
-                    "latitude": 28.3217198,
-                    "longitude": -81.38180539999999
-                }
+                "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg"
             }
         ],
         "city": "nuevonuevo",
-        "submitted_date": "2025-10-09 22:28:52"
+        "submitted_date": "2025-10-09 22:28:52",
+        "coordinates": {
+            "latitude": 28.3217198,
+            "longitude": -81.38180539999999
+        }
     },
     {
         "community": "testing",
@@ -369,7 +522,13 @@
                 "details": "555",
                 "photo": "assets/thumbnailnone.png"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "testing 2",
@@ -380,7 +539,13 @@
                 "details": "555",
                 "photo": "assets/gate_20251008_004011_4567fc.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "probando222",
@@ -388,9 +553,16 @@
             {
                 "code": "222",
                 "notes": "22",
+                "details": "",
                 "photo": "assets/thumbnailnone.png"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "probandoprobando",
@@ -413,16 +585,30 @@
                 "details": "6456",
                 "photo": "assets/gate_20251009_162101_64288f.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "www",
         "codes": [
             {
                 "code": "www",
+                "notes": "",
+                "details": "",
                 "photo": "assets/thumbnailnone.png"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "holahola",
@@ -445,7 +631,13 @@
                 "details": "yasabe",
                 "photo": "assets/gate_holahola_20251009_214755.jpg"
             }
-        ]
+        ],
+        "city": "",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "orlando3254354",
@@ -457,7 +649,12 @@
                 "photo": ""
             }
         ],
-        "city": "orlando3254354"
+        "city": "orlando3254354",
+        "submitted_date": "",
+        "coordinates": {
+            "latitude": null,
+            "longitude": null
+        }
     },
     {
         "community": "Testeando22",
@@ -466,15 +663,15 @@
                 "code": "Testeando",
                 "notes": "Testeando",
                 "details": "Testeando",
-                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg",
-                "coordinates": {
-                    "latitude": 28.3217198,
-                    "longitude": -81.38180539999999
-                }
+                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg"
             }
         ],
         "city": "Testeando",
-        "submitted_date": "2025-10-09 22:31:32"
+        "submitted_date": "2025-10-09 22:31:32",
+        "coordinates": {
+            "latitude": 28.3217198,
+            "longitude": -81.38180539999999
+        }
     },
     {
         "community": "santo",
@@ -483,14 +680,14 @@
                 "code": "1111",
                 "notes": "main entrance",
                 "details": "55345",
-                "photo": "assets/temp_gate_20251009_224631_96bdfb.jpg",
-                "coordinates": {
-                    "latitude": 28.3217198,
-                    "longitude": -81.38180539999999
-                }
+                "photo": "assets/temp_gate_20251009_224631_96bdfb.jpg"
             }
         ],
         "city": "distrito nacional",
-        "submitted_date": "2025-10-09 22:46:34"
+        "submitted_date": "2025-10-09 23:02:05",
+        "coordinates": {
+            "latitude": 28.3217198,
+            "longitude": -81.38180539999999
+        }
     }
 ]

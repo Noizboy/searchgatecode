@@ -82,8 +82,19 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- USERS PAGE CONTENT -->
 <div class="page-header">
-  <h1 class="page-title">Users</h1>
-  <p class="page-subtitle">Manage user PIN codes for app access</p>
+  <div class="page-header-left">
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="page-header-content">
+      <h1 class="page-title">Users</h1>
+      <p class="page-subtitle">Manage user PIN codes for app access</p>
+    </div>
+  </div>
 </div>
 
 <div class="users-container">
@@ -157,11 +168,6 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <style>
-.page-header {
-  flex-shrink: 0;
-  margin-bottom: 24px;
-}
-
 .users-container {
   display: flex;
   flex-direction: column;
@@ -176,19 +182,6 @@ require_once __DIR__ . '/includes/header.php';
   overflow-x: hidden;
   padding-right: 8px;
   min-height: 0;
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text);
-  margin: 0 0 8px 0;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  color: var(--muted);
-  margin: 0;
 }
 
 .card {
@@ -284,10 +277,6 @@ require_once __DIR__ . '/includes/header.php';
 
   .btn-group {
     width: 100%;
-  }
-
-  .page-header {
-    margin-bottom: 16px;
   }
 
   .users-scroll-wrapper {

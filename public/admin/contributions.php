@@ -32,8 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($community && !empty($codes)) {
         $idx = find_comm_index($data, $community);
 
-        // Process each code
+        // Process each code and extract coordinates for community level
         $processedCodes = [];
+        $communityCoordinates = null;
+
         foreach ($codes as $codeData) {
           $newCode = [
             'code' => trim($codeData['code'] ?? ''),
@@ -42,9 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'photo' => trim($codeData['photo'] ?? '')
           ];
 
-          // Add coordinates if available
-          if (isset($codeData['coordinates'])) {
-            $newCode['coordinates'] = $codeData['coordinates'];
+          // Extract coordinates to community level (don't store in individual codes)
+          if (!$communityCoordinates && isset($codeData['coordinates']) &&
+              isset($codeData['coordinates']['latitude']) &&
+              isset($codeData['coordinates']['longitude'])) {
+            $communityCoordinates = $codeData['coordinates'];
           }
 
           // If photo is in temp_assets, move it to assets with community name
@@ -110,6 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($sugg['submitted_date'])) {
               $data[$idx]['submitted_date'] = $sugg['submitted_date'];
             }
+            // Update coordinates at community level if available and not already set
+            if ($communityCoordinates && !isset($data[$idx]['coordinates'])) {
+              $data[$idx]['coordinates'] = $communityCoordinates;
+            }
           } else {
             // New community
             $newCommunity = [
@@ -122,6 +130,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Add submitted_date if available
             if (!empty($sugg['submitted_date'])) {
               $newCommunity['submitted_date'] = $sugg['submitted_date'];
+            }
+            // Add coordinates at community level if available
+            if ($communityCoordinates) {
+              $newCommunity['coordinates'] = $communityCoordinates;
             }
             $data[] = $newCommunity;
           }
@@ -221,8 +233,19 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- CONTRIBUTIONS PAGE CONTENT -->
 <div class="page-header">
-  <h1 class="page-title">User Contributions</h1>
-  <p class="page-subtitle">Review and approve community suggestions from users</p>
+  <div class="page-header-left">
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="page-header-content">
+      <h1 class="page-title">User Contributions</h1>
+      <p class="page-subtitle">Review and approve community suggestions from users</p>
+    </div>
+  </div>
 </div>
 
 <div class="contributions-container">
@@ -305,11 +328,6 @@ require_once __DIR__ . '/includes/header.php';
 </div>
 
 <style>
-.page-header {
-  flex-shrink: 0;
-  margin-bottom: 24px;
-}
-
 .contributions-container {
   display: flex;
   flex-direction: column;

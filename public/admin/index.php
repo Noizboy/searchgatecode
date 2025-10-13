@@ -112,6 +112,48 @@ function delete_photo_by_url($url){
   return @unlink($p);
 }
 
+/******************** GPS EXTRACTION HELPERS ********************/
+function getGPS($exifCoord, $hemi) {
+  $degrees = count($exifCoord) > 0 ? getGPSPart($exifCoord[0]) : 0;
+  $minutes = count($exifCoord) > 1 ? getGPSPart($exifCoord[1]) : 0;
+  $seconds = count($exifCoord) > 2 ? getGPSPart($exifCoord[2]) : 0;
+
+  $flip = ($hemi == 'W' or $hemi == 'S') ? -1 : 1;
+  return $flip * ($degrees + $minutes / 60 + $seconds / 3600);
+}
+
+function getGPSPart($coordPart) {
+  if (strpos($coordPart, '/') === false) {
+    return floatval($coordPart);
+  }
+  $parts = explode('/', $coordPart);
+  if (count($parts) <= 0) return 0;
+  if (count($parts) == 1) return floatval($parts[0]);
+  return floatval($parts[0]) / floatval($parts[1]);
+}
+
+function extractGPSCoordinates($imagePath) {
+  if (!function_exists('exif_read_data')) {
+    return null;
+  }
+
+  $exif = @exif_read_data($imagePath, 'GPS');
+  if (!$exif || !isset($exif['GPSLatitude']) || !isset($exif['GPSLongitude'])) {
+    return null;
+  }
+
+  $latitudeRef = $exif['GPSLatitudeRef'] ?? 'N';
+  $longitudeRef = $exif['GPSLongitudeRef'] ?? 'E';
+
+  $latitude = getGPS($exif['GPSLatitude'], $latitudeRef);
+  $longitude = getGPS($exif['GPSLongitude'], $longitudeRef);
+
+  return [
+    'latitude' => round($latitude, 6),
+    'longitude' => round($longitude, 6)
+  ];
+}
+
 /******************** COUNT SUGGESTIONS ********************/
 $suggest_count = 0;
 if(file_exists(SUGGEST_JSON)){
@@ -198,7 +240,15 @@ if (($_GET['ajax'] ?? '') === 'upload' && $_SERVER['REQUEST_METHOD']==='POST') {
   if ($ext === '') $out('fail', ['error'=>'ext_resolve_failed']);
   $dest = ASSETS_DIR.$base.$ext;
   if (!@move_uploaded_file($tmp, $dest)) $out('fail', ['error'=>'move_failed']);
-  echo json_encode(['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)]);
+
+  // Extract GPS coordinates from image
+  $coordinates = extractGPSCoordinates($dest);
+  $response = ['status'=>'ok','url'=>ASSETS_RELATIVE.basename($dest)];
+  if ($coordinates) {
+    $response['coordinates'] = $coordinates;
+  }
+
+  echo json_encode($response);
   exit;
 }
 
@@ -377,6 +427,20 @@ if ($action === 'update') {
       if ($city !== '') {
         $updatedCommunity['city'] = $city;
       }
+
+      // Handle coordinates
+      $latitude = trim($_POST['latitude'] ?? '');
+      $longitude = trim($_POST['longitude'] ?? '');
+      if ($latitude !== '' && $longitude !== '') {
+        $updatedCommunity['coordinates'] = [
+          'latitude' => floatval($latitude),
+          'longitude' => floatval($longitude)
+        ];
+      } elseif (isset($data[$idx]['coordinates'])) {
+        // Preserve existing coordinates if not updated
+        $updatedCommunity['coordinates'] = $data[$idx]['coordinates'];
+      }
+
       $data[$idx] = $updatedCommunity;
       write_json(GATES_JSON,$data);
       header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community updated successfully.'));
@@ -1196,18 +1260,15 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   /* RESPONSIVE */
   .mobile-menu-toggle {
     display: none;
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 1001;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
+    background: transparent;
+    border: none;
     width: 40px;
     height: 40px;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    padding: 0;
+    color: var(--text);
   }
 
   /* Removed - consolidated below */
@@ -1232,9 +1293,20 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     justify-content: space-between;
     align-items: center;
     gap: 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
   }
 
   .page-header-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .page-header-content {
     flex: 1;
   }
 
@@ -1390,6 +1462,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     overflow-x: hidden;
     padding-right: 8px;
     margin-bottom: 12px;
+    scroll-snap-type: y mandatory;
   }
 
   .edit-code-item {
@@ -1398,6 +1471,8 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 16px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .edit-code-header {
@@ -1445,7 +1520,35 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
     .page-header {
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .page-header-left {
+      gap: 12px;
+    }
+
+    .page-header-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      margin: 0 0 4px 0;
+    }
+
+    .page-subtitle {
+      font-size: 0.875rem;
+    }
+
+    .page-header-right {
+      width: 100%;
+    }
+
+    .page-header-right .btn {
+      width: 100%;
     }
 
     .home-container {
@@ -1472,6 +1575,27 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     .form-row {
       grid-template-columns: 1fr !important;
     }
+
+    .edit-modal-footer {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .edit-modal-footer > * {
+      width: 100%;
+      margin: 0 !important;
+    }
+
+    .edit-modal-footer > div {
+      margin-left: 0 !important;
+      flex-direction: column-reverse;
+      width: 100%;
+    }
+
+    .edit-modal-footer .btn {
+      width: 100%;
+    }
+
 
     #home-section {
       height: calc(100vh - 200px);
@@ -1618,8 +1742,17 @@ require_once __DIR__ . '/includes/sidebar.php';
     <!-- PAGE HEADER -->
     <div class="page-header">
       <div class="page-header-left">
-        <h1 class="page-title">Communities</h1>
-        <p class="page-subtitle">Manage your community gate codes</p>
+        <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div class="page-header-content">
+          <h1 class="page-title">Communities</h1>
+          <p class="page-subtitle">Manage your community gate codes</p>
+        </div>
       </div>
       <div class="page-header-right">
         <button class="btn btn-primary" id="openAddNewModal">
@@ -1660,8 +1793,13 @@ require_once __DIR__ . '/includes/sidebar.php';
                   <?php endif; ?>
                 </div>
                 <div class="btn-group">
-                  <button class="btn btn-edit-comm" data-community="<?= htmlspecialchars($row['community']) ?>">Edit</button>
-                  <button class="btn btn-danger btn-delete-comm" data-community="<?= htmlspecialchars($row['community']) ?>">Delete</button>
+                  <button class="btn btn-edit-comm" data-community="<?= htmlspecialchars($row['community']) ?>">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    View
+                  </button>
                 </div>
               </div>
               <div class="codes-list">
@@ -1885,7 +2023,17 @@ require_once __DIR__ . '/includes/sidebar.php';
   <div class="edit-modal-content">
     <div class="edit-modal-header">
       <h2 id="editModalTitle">Edit Community</h2>
-      <button class="btn" id="closeEditModal" type="button">✕</button>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn btn-danger" id="deleteEditCommunity" type="button" title="Delete Community">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        </button>
+        <button class="btn" id="closeEditModal" type="button">✕</button>
+      </div>
     </div>
     <div class="edit-modal-body" id="editModalBody">
       <form id="editCommunityForm" method="post">
@@ -1893,6 +2041,7 @@ require_once __DIR__ . '/includes/sidebar.php';
         <input type="hidden" name="action" value="update">
         <input type="hidden" name="original" id="editOriginalName" value="">
 
+        <!-- STATIC HEADER -->
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Community Name</label>
@@ -1905,18 +2054,27 @@ require_once __DIR__ . '/includes/sidebar.php';
           </div>
         </div>
 
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">GPS Coordinates (optional)</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <input type="text" class="field" name="latitude" id="editLatitude" placeholder="Latitude (e.g., 28.5383)">
+            <input type="text" class="field" name="longitude" id="editLongitude" placeholder="Longitude (e.g., -81.3792)">
+          </div>
+          <input type="hidden" name="coordinates" id="editCoordinates" value="">
+        </div>
+
+        <!-- SCROLLABLE CODES AREA -->
         <div class="form-group">
           <label class="form-label">Codes</label>
+        </div>
+        <div class="modal-codes-scroll-wrapper">
           <div id="editCodesContainer"></div>
         </div>
       </form>
     </div>
     <div class="edit-modal-footer">
       <button type="button" class="btn" id="addEditCodeBtn">+ Add Code</button>
-      <div style="margin-left: auto; display: flex; gap: 12px;">
-        <button class="btn" id="cancelEditModal">Cancel</button>
-        <button class="btn btn-primary" id="saveEditModal">Save Changes</button>
-      </div>
+      <button class="btn btn-primary" id="saveEditModal" style="margin-left: auto;">Save Changes</button>
     </div>
   </div>
 </div>
@@ -1958,10 +2116,7 @@ require_once __DIR__ . '/includes/sidebar.php';
     </div>
     <div class="edit-modal-footer">
       <button type="button" class="btn" id="addNewCodeBtn">+ Add Code</button>
-      <div style="margin-left: auto; display: flex; gap: 12px;">
-        <button class="btn" id="cancelAddNewModal">Cancel</button>
-        <button class="btn btn-primary" id="saveAddNewModal">Add Community</button>
-      </div>
+      <button class="btn btn-primary" id="saveAddNewModal" style="margin-left: auto;">Add Community</button>
     </div>
   </div>
 </div>
@@ -2045,7 +2200,14 @@ function createCodeRow(index) {
       <div class="upload-status" id="status-${index}" style="margin-top: 8px; font-size: 0.85rem; color: var(--muted);"></div>
     </div>
     <div class="full-width">
-      <button type="button" class="btn btn-danger btn-remove-code">Remove Code</button>
+      <button type="button" class="btn btn-danger btn-remove-code" title="Remove Code">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
     </div>
   `;
   return div;
@@ -2169,9 +2331,11 @@ const editCommunityForm = document.getElementById('editCommunityForm');
 const editOriginalName = document.getElementById('editOriginalName');
 const editCommunityName = document.getElementById('editCommunityName');
 const editCityName = document.getElementById('editCityName');
+const editLatitude = document.getElementById('editLatitude');
+const editLongitude = document.getElementById('editLongitude');
+const editCoordinates = document.getElementById('editCoordinates');
 const editCodesContainer = document.getElementById('editCodesContainer');
 const closeEditModal = document.getElementById('closeEditModal');
-const cancelEditModal = document.getElementById('cancelEditModal');
 const saveEditModal = document.getElementById('saveEditModal');
 const addEditCodeBtn = document.getElementById('addEditCodeBtn');
 
@@ -2192,6 +2356,21 @@ function openEditModal(communityName) {
   editOriginalName.value = communityName;
   editCommunityName.value = communityName;
   editCityName.value = community.city || '';
+
+  // Load coordinates if available
+  const latInput = document.getElementById('editLatitude');
+  const lonInput = document.getElementById('editLongitude');
+
+  if (community.coordinates) {
+    const lat = community.coordinates.latitude || '';
+    const lon = community.coordinates.longitude || '';
+    if (latInput) latInput.value = lat;
+    if (lonInput) lonInput.value = lon;
+  } else {
+    if (latInput) latInput.value = '';
+    if (lonInput) lonInput.value = '';
+  }
+
   editCodesContainer.innerHTML = '';
   editCodeIndex = 0;
   editCodeFiles.clear();
@@ -2237,7 +2416,14 @@ function addEditCodeRow(codeData = null) {
   div.innerHTML = `
     <div class="edit-code-header">
       <strong style="color: var(--text);">Code #${index + 1}</strong>
-      <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${index}">Remove</button>
+      <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${index}" title="Remove Code">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
     </div>
     <div class="edit-code-grid">
       <div class="form-group">
@@ -2286,6 +2472,7 @@ function wireEditCodeRow(row, index) {
     const fd = new FormData();
     fd.append('key', ADMIN_KEY);
     fd.append('photo', file);
+    fd.append('community_name', editCommunityName.value);
 
     try {
       const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
@@ -2299,7 +2486,17 @@ function wireEditCodeRow(row, index) {
         photoInput.value = result.url;
         previewImg.src = result.url;
         preview.classList.add('show');
-        status.textContent = 'Uploaded!';
+
+        // Update coordinates if image has GPS and community doesn't have coordinates yet
+        const latInput = document.getElementById('editLatitude');
+        const lonInput = document.getElementById('editLongitude');
+        if (result.coordinates && latInput && lonInput && (!latInput.value || !lonInput.value)) {
+          latInput.value = result.coordinates.latitude;
+          lonInput.value = result.coordinates.longitude;
+          status.textContent = 'Uploaded with GPS!';
+        } else {
+          status.textContent = 'Uploaded!';
+        }
         status.style.color = 'var(--brand)';
       } else {
         status.textContent = `Error: ${result.error || 'Upload failed'}`;
@@ -2325,7 +2522,6 @@ addEditCodeBtn.addEventListener('click', () => {
 });
 
 closeEditModal.addEventListener('click', closeEditModalFunc);
-cancelEditModal.addEventListener('click', closeEditModalFunc);
 
 saveEditModal.addEventListener('click', () => {
   if (editCommunityForm.checkValidity()) {
@@ -2333,6 +2529,23 @@ saveEditModal.addEventListener('click', () => {
   } else {
     editCommunityForm.reportValidity();
   }
+});
+
+// Delete Community button in modal
+const deleteEditCommunity = document.getElementById('deleteEditCommunity');
+deleteEditCommunity.addEventListener('click', () => {
+  const community = editOriginalName.value;
+  if (!confirm(`Delete community "${community}"? This action cannot be undone.`)) return;
+
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.innerHTML = `
+    <input type="hidden" name="key" value="${ADMIN_KEY}">
+    <input type="hidden" name="action" value="delete_comm">
+    <input type="hidden" name="community" value="${community}">
+  `;
+  document.body.appendChild(form);
+  form.submit();
 });
 
 // Close modal on background click
@@ -2422,7 +2635,6 @@ if (jsonFileInput) {
 const addNewModal = document.getElementById('addNewModal');
 const openAddNewModalBtn = document.getElementById('openAddNewModal');
 const closeAddNewModalBtn = document.getElementById('closeAddNewModal');
-const cancelAddNewModalBtn = document.getElementById('cancelAddNewModal');
 const saveAddNewModalBtn = document.getElementById('saveAddNewModal');
 const addNewForm = document.getElementById('addNewForm');
 const addNewCodesContainer = document.getElementById('addNewCodesContainer');
@@ -2455,7 +2667,14 @@ function createAddNewCodeRow(index) {
   div.innerHTML = `
     <div class="edit-code-header">
       <strong style="color: var(--text);">Code #${index + 1}</strong>
-      <button type="button" class="btn btn-danger btn-remove-add-code">Remove</button>
+      <button type="button" class="btn btn-danger btn-remove-add-code" title="Remove Code">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
     </div>
     <div class="edit-code-grid">
       <!-- Code and Notes side by side -->
@@ -2549,7 +2768,6 @@ function addAddNewCodeRow(codeData = null) {
 
 openAddNewModalBtn.addEventListener('click', openAddNewModal);
 closeAddNewModalBtn.addEventListener('click', closeAddNewModal);
-cancelAddNewModalBtn.addEventListener('click', closeAddNewModal);
 
 addNewCodeBtn.addEventListener('click', () => {
   addAddNewCodeRow();

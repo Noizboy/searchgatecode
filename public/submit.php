@@ -486,23 +486,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   @media (max-width: 768px) {
-    .title{font-size:2.2rem}
+    main {
+      padding: 24px 40px 40px 40px;
+    }
+
+    .title {
+      font-size: 2.2rem;
+      letter-spacing: 1px;
+    }
+
+    .sub {
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
 
     .form-container {
-      padding: 24px 20px;
+      padding: 20px 16px;
+      border-radius: 12px;
+      margin: 0 8px;
+    }
+
+    .form-title {
+      font-size: 1.25rem;
+      margin-bottom: 16px;
     }
 
     .form-row {
       grid-template-columns: 1fr;
+      gap: 0;
     }
 
     .code-row {
       grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .codes-section {
+      margin-top: 24px;
+      padding-top: 20px;
+    }
+
+    .codes-list {
+      gap: 16px;
+      max-height: 400px;
+    }
+
+    .code-item {
+      padding: 16px;
+    }
+
+    .code-header {
+      flex-direction: row;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .code-number {
+      font-size: 1rem;
+    }
+
+    .code-header .btn-danger {
+      width: auto;
+      padding: 8px 14px;
+      white-space: nowrap;
+      font-size: 0.85rem;
     }
 
     .form-actions {
       flex-direction: column;
       align-items: stretch;
+      gap: 12px;
+      margin-top: 24px;
+      padding-top: 20px;
     }
 
     .btn-group {
@@ -511,17 +566,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     .btn {
       width: 100%;
+      padding: 14px 20px;
+      font-size: 15px;
     }
 
-    .code-header {
-      flex-direction: row;
-      align-items: center;
+    .alert {
+      padding: 14px 16px;
+      font-size: 0.9rem;
     }
 
-    .code-header .btn-danger {
-      width: auto;
-      padding: 8px 16px;
-      white-space: nowrap;
+    .file-upload-label {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .file-upload-label svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .file-preview img {
+      max-width: 100% !important;
+      max-height: 180px !important;
     }
 
     .theme-toggle {
@@ -530,9 +596,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       top: 15px;
       right: 15px;
     }
+
     .theme-toggle svg {
       width: 20px;
       height: 20px;
+    }
+
+    footer {
+      padding: 16px 12px;
+      font-size: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .title {
+      font-size: 1.8rem;
+    }
+
+    .form-container {
+      padding: 16px 12px;
+      margin: 0 6px;
+    }
+
+    .code-item {
+      padding: 12px;
+    }
+
+    .btn {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+
+    .code-header .btn-danger {
+      padding: 6px 12px;
+      font-size: 0.8rem;
     }
   }
 </style>
@@ -657,7 +754,7 @@ function createCodeItem(index) {
 
     <div class="code-row">
       <div class="form-group">
-        <label class="form-label">Gate Code *</label>
+        <label class="form-label">Code *</label>
         <input type="text" class="field" name="code[]" placeholder="e.g., #1234" required>
       </div>
 
@@ -701,11 +798,37 @@ function addCode() {
   const codeItem = createCodeItem(codeCounter);
   codesList.appendChild(codeItem);
   codeCounter++;
-  updateCodeNumbers();
+}
+
+function updateCodeNumbers() {
+  const codeItems = document.querySelectorAll('.code-item');
+  codeItems.forEach((item, index) => {
+    const codeNumber = item.querySelector('.code-number');
+    if (codeNumber) {
+      codeNumber.textContent = `Code #${index + 1}`;
+    }
+  });
 }
 
 // Event Listeners
 document.getElementById('addCodeBtn').addEventListener('click', addCode);
+
+// Handle remove code button
+document.getElementById('codesList').addEventListener('click', (e) => {
+  if (e.target.classList.contains('btn-remove-code') || e.target.closest('.btn-remove-code')) {
+    const btn = e.target.classList.contains('btn-remove-code') ? e.target : e.target.closest('.btn-remove-code');
+    const codeItem = btn.closest('.code-item');
+    const codesList = document.getElementById('codesList');
+
+    // Only remove if there's more than one code
+    if (codesList.children.length > 1) {
+      codeItem.remove();
+      updateCodeNumbers();
+    } else {
+      alert('You must have at least one code.');
+    }
+  }
+});
 
 // Handle photo uploads
 document.getElementById('codesList').addEventListener('change', async (e) => {

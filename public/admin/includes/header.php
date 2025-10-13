@@ -239,6 +239,48 @@
     min-height: 0;
   }
 
+  /* PAGE HEADER */
+  .page-header {
+    flex-shrink: 0;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+
+  .page-header-left {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .page-header-content {
+    flex: 1;
+  }
+
+  .page-header-right {
+    flex-shrink: 0;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 8px 0;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
   /* CARDS */
   .card {
     background: linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -371,18 +413,23 @@
   /* RESPONSIVE */
   .mobile-menu-toggle {
     display: none;
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 1001;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
+    background: transparent;
+    border: none;
     width: 40px;
     height: 40px;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    padding: 0;
+    color: var(--text);
+  }
+
+  .mobile-menu-toggle svg {
+    transition: transform 0.3s ease;
+  }
+
+  .mobile-menu-toggle:hover svg {
+    transform: scale(1.1);
   }
 
   @media (max-width: 768px) {
@@ -403,7 +450,40 @@
     }
 
     .content-body {
-      padding: 20px 20px 20px 70px;
+      padding: 20px;
+    }
+
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 16px;
+      gap: 16px;
+    }
+
+    .page-header-left {
+      gap: 12px;
+    }
+
+    .page-header-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      margin: 0 0 4px 0;
+    }
+
+    .page-subtitle {
+      font-size: 0.875rem;
+    }
+
+    .page-header-right {
+      width: 100%;
+    }
+
+    .page-header-right .btn {
+      width: 100%;
     }
   }
 
