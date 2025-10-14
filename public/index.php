@@ -357,6 +357,21 @@
     background:var(--btn-secondary-bg); color:var(--btn-secondary-text); border:1px solid var(--btn-secondary-border);
     padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:600
   }
+  .modal-close-x {
+    width: 40px;
+    height: 40px;
+    font-size: 32px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .modal-close-x:hover {
+    background: var(--btn-secondary-hover);
+    transform: scale(1.05);
+  }
   .modal-body{
     padding:0; display:flex; flex-direction:column; overflow:auto;
   }
@@ -468,9 +483,136 @@
     background: var(--btn-secondary-hover);
   }
 
+  /* Report Modal */
+  .report-modal {
+    background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2));
+    border: 1px solid var(--modal-border);
+    border-radius: 12px;
+    width: min(90vw, 500px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    overflow: hidden;
+  }
+
+  .report-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .report-modal-header .modal-close {
+    width: 40px;
+    height: 40px;
+    font-size: 32px;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--btn-secondary-bg);
+    color: var(--btn-secondary-text);
+    border: 1px solid var(--btn-secondary-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .report-modal-header .modal-close:hover {
+    background: var(--btn-secondary-hover);
+    transform: scale(1.05);
+  }
+
+  .report-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .report-modal-body {
+    padding: 24px;
+  }
+
+  .report-info {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    padding: 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  .report-code-label,
+  .report-community-label {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .report-code-value {
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--brand);
+  }
+
+  .report-community-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .field-select {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+  }
+
+  .field-select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(59, 221, 130, .15);
+  }
+
+  .field-select option {
+    background: var(--panel);
+    color: var(--text);
+  }
+
+  .report-modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+
+  .report-modal-footer .btn-secondary,
+  .report-modal-footer .btn-report {
+    min-width: 100px;
+  }
+
   /* Theme Toggle Button */
   .theme-toggle {
-    position: fixed;
+    position: absolute;
     top: 20px;
     right: 20px;
     background: var(--panel);
@@ -498,6 +640,10 @@
   }
   .theme-toggle:hover svg {
     transform: rotate(20deg);
+  }
+
+  main {
+    position: relative;
   }
 
   @media (max-width: 480px) {
@@ -570,7 +716,7 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <div id="modalTitle" class="modal-title">Details</div>
-        <button class="modal-close" id="modalClose" type="button">Close</button>
+        <button class="modal-close modal-close-x" id="modalClose" type="button">&times;</button>
       </div>
       <div class="modal-body">
         <img id="modalImg" class="modal-img" alt="Location photo" />
@@ -587,6 +733,40 @@
       <div id="alertTitle" class="alert-title"></div>
       <div id="alertMessage" class="alert-message"></div>
       <div id="alertActions" class="alert-actions"></div>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div id="reportBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="report-modal" role="dialog" aria-modal="true">
+      <div class="report-modal-header">
+        <h3 class="report-modal-title">Report Gate Code</h3>
+        <button class="modal-close" id="reportModalClose" type="button">&times;</button>
+      </div>
+      <div class="report-modal-body">
+        <div class="report-info">
+          <div class="report-code-label">Code:</div>
+          <div id="reportCodeDisplay" class="report-code-value"></div>
+          <div class="report-community-label">Community:</div>
+          <div id="reportCommunityDisplay" class="report-community-value"></div>
+        </div>
+        <div class="form-group" style="margin-top: 20px;">
+          <label class="form-label" for="reportReason">Reason for reporting:</label>
+          <select id="reportReason" class="field-select">
+            <option value="">Select a reason...</option>
+            <option value="incorrect">Code is incorrect</option>
+            <option value="outdated">Code is outdated/changed</option>
+            <option value="not_working">Code not working anymore</option>
+            <option value="wrong_community">Wrong community assigned</option>
+            <option value="duplicate">Duplicate entry</option>
+            <option value="other">Other reason</option>
+          </select>
+        </div>
+      </div>
+      <div class="report-modal-footer">
+        <button class="btn-secondary" id="reportCancelBtn" type="button">Cancel</button>
+        <button class="btn-report" id="reportSubmitBtn" type="button">Report Code</button>
+      </div>
     </div>
   </div>
 
@@ -663,7 +843,6 @@ function renderResults(items){
               <button class="btn-secondary btn-details"
                 data-community="${escapeHtml(it.community)}"
                 data-code="${escapeHtml(c.code)}"
-                data-details="${escapeHtml(c.details||'')}"
                 data-photo="${escapeHtml(c.photo||'')}"
                 data-notes="${escapeHtml(c.notes||'')}">Details</button>
               <button class="btn-report" data-community="${escapeHtml(it.community)}" data-code="${escapeHtml(c.code)}">Report</button>
@@ -679,7 +858,6 @@ function renderResults(items){
       openModal({
         community: btn.dataset.community,
         code: btn.dataset.code,
-        details: btn.dataset.details,
         photo: btn.dataset.photo,
         notes: btn.dataset.notes
       });
@@ -748,105 +926,10 @@ function renderResults(items){
   });
 
   res.querySelectorAll('.btn-report').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
+    btn.addEventListener('click', ()=>{
       const comm = btn.getAttribute('data-community');
       const code = btn.getAttribute('data-code');
-
-      // Show confirmation alert
-      showAlert({
-        type: 'warning',
-        title: 'Report Gate Code',
-        message: `Are you sure you want to report the code "${code}" from ${comm}? This will help us identify potentially incorrect or outdated codes.`,
-        buttons: [
-          {
-            text: 'Cancel',
-            className: 'btn-alert-secondary'
-          },
-          {
-            text: 'Yes, Report',
-            className: 'btn-alert-danger',
-            onClick: async () => {
-              // Disable button to prevent double-clicks
-              const originalText = btn.textContent;
-              btn.disabled = true;
-              btn.textContent = 'Reporting...';
-
-              try {
-                const response = await fetch('report_gate.php', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    community: comm,
-                    code: code
-                  })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                  // Update local DATA
-                  const community = DATA.find(x => x.community === comm);
-                  if (community) {
-                    const codeObj = community.codes.find(c => c.code === code);
-                    if (codeObj) {
-                      codeObj.report_count = (codeObj.report_count || 0) + 1;
-                    }
-                  }
-
-                  // Re-render results to show updated badge
-                  const q = document.getElementById('q').value.trim();
-                  search(q);
-
-                  // Show success message
-                  showAlert({
-                    type: 'success',
-                    title: 'Report Submitted',
-                    message: `Thank you for reporting the code "${code}" from ${comm}. Your feedback helps keep our database accurate and up-to-date.`,
-                    buttons: [
-                      {
-                        text: 'Close',
-                        className: 'btn-alert-primary'
-                      }
-                    ]
-                  });
-                } else {
-                  // Show error message
-                  showAlert({
-                    type: 'error',
-                    title: 'Report Failed',
-                    message: result.message || 'Failed to submit report. Please try again.',
-                    buttons: [
-                      {
-                        text: 'Close',
-                        className: 'btn-alert-secondary'
-                      }
-                    ]
-                  });
-                  btn.disabled = false;
-                  btn.textContent = originalText;
-                }
-              } catch (error) {
-                console.error('Error reporting gate:', error);
-                showAlert({
-                  type: 'error',
-                  title: 'Connection Error',
-                  message: 'Failed to submit report. Please check your connection and try again.',
-                  buttons: [
-                    {
-                      text: 'Close',
-                      className: 'btn-alert-secondary'
-                    }
-                  ]
-                });
-                btn.disabled = false;
-                btn.textContent = originalText;
-              }
-            }
-          }
-        ]
-      });
+      openReportModal(comm, code, btn);
     });
   });
 }
@@ -878,12 +961,26 @@ document.getElementById('searchForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const q = document.getElementById('q').value.trim();
   if(!DATA.length) await loadData();
-  
+
   const title = document.getElementById('title');
   title.classList.add('animate');
   setTimeout(()=> title.classList.remove('animate'), 600);
 
   if(!q){ renderNone(''); return; }
+
+  // Track search usage
+  try {
+    await fetch('track_search.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `query=${encodeURIComponent(q)}`
+    });
+  } catch (error) {
+    console.error('Failed to track search:', error);
+  }
+
   search(q);
 });
 
@@ -893,7 +990,7 @@ const modalText = document.getElementById('modalText');
 const modalMeta = document.getElementById('modalMeta');
 const modalClose = document.getElementById('modalClose');
 
-function openModal({community, code, details, photo, notes}){
+function openModal({community, code, photo, notes}){
   document.getElementById('modalTitle').textContent = `Details — ${community}`;
 
   const src = resolvePhoto(photo);
@@ -904,8 +1001,8 @@ function openModal({community, code, details, photo, notes}){
   modalImg.src = src;
   modalImg.alt = photo ? `Photo for ${community} (${code})` : 'No photo available';
 
-  modalText.textContent = details || 'No extra details.';
-  modalMeta.textContent = `${community} • Code: ${code}${notes ? ' • ' + notes : ''}`;
+  modalText.textContent = notes || 'No extra information.';
+  modalMeta.textContent = `${community} • Code: ${code}`;
   backdrop.classList.add('open');
   backdrop.setAttribute('aria-hidden','false');
   modalClose.focus();
@@ -1149,6 +1246,148 @@ gpsBtn.addEventListener('click', async () => {
   );
 });
 
+// Report Modal Functions
+const reportBackdrop = document.getElementById('reportBackdrop');
+const reportModalClose = document.getElementById('reportModalClose');
+const reportCodeDisplay = document.getElementById('reportCodeDisplay');
+const reportCommunityDisplay = document.getElementById('reportCommunityDisplay');
+const reportReason = document.getElementById('reportReason');
+const reportCancelBtn = document.getElementById('reportCancelBtn');
+const reportSubmitBtn = document.getElementById('reportSubmitBtn');
+
+let currentReportData = null;
+
+function openReportModal(community, code, btnElement) {
+  currentReportData = { community, code, btnElement };
+
+  reportCodeDisplay.textContent = code;
+  reportCommunityDisplay.textContent = community;
+  reportReason.value = '';
+
+  reportBackdrop.classList.add('open');
+  reportBackdrop.setAttribute('aria-hidden', 'false');
+  reportReason.focus();
+}
+
+function closeReportModal() {
+  reportBackdrop.classList.remove('open');
+  reportBackdrop.setAttribute('aria-hidden', 'true');
+  currentReportData = null;
+}
+
+reportModalClose.addEventListener('click', closeReportModal);
+reportCancelBtn.addEventListener('click', closeReportModal);
+
+reportBackdrop.addEventListener('click', (e) => {
+  if (e.target === reportBackdrop) closeReportModal();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && reportBackdrop.classList.contains('open')) {
+    closeReportModal();
+  }
+});
+
+reportSubmitBtn.addEventListener('click', async () => {
+  if (!currentReportData) return;
+
+  const reason = reportReason.value.trim();
+  if (!reason) {
+    reportReason.style.borderColor = 'var(--danger)';
+    reportReason.focus();
+    return;
+  }
+
+  const { community, code, btnElement } = currentReportData;
+
+  // Disable submit button
+  const originalText = reportSubmitBtn.textContent;
+  reportSubmitBtn.disabled = true;
+  reportSubmitBtn.textContent = 'Reporting...';
+
+  try {
+    const response = await fetch('report_gate.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        community: community,
+        code: code,
+        reason: reason
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Update local DATA
+      const communityObj = DATA.find(x => x.community === community);
+      if (communityObj) {
+        const codeObj = communityObj.codes.find(c => c.code === code);
+        if (codeObj) {
+          codeObj.report_count = (codeObj.report_count || 0) + 1;
+        }
+      }
+
+      // Close report modal
+      closeReportModal();
+
+      // Re-render results to show updated badge
+      const q = document.getElementById('q').value.trim();
+      search(q);
+
+      // Show success message
+      showAlert({
+        type: 'success',
+        title: 'Report Submitted',
+        message: `Thank you for reporting the code "${code}" from ${community}. Your feedback helps keep our database accurate and up-to-date.`,
+        buttons: [
+          {
+            text: 'Close',
+            className: 'btn-alert-primary'
+          }
+        ]
+      });
+    } else {
+      // Show error message
+      closeReportModal();
+      showAlert({
+        type: 'error',
+        title: 'Report Failed',
+        message: result.message || 'Failed to submit report. Please try again.',
+        buttons: [
+          {
+            text: 'Close',
+            className: 'btn-alert-secondary'
+          }
+        ]
+      });
+    }
+  } catch (error) {
+    console.error('Error reporting gate:', error);
+    closeReportModal();
+    showAlert({
+      type: 'error',
+      title: 'Connection Error',
+      message: 'Failed to submit report. Please check your connection and try again.',
+      buttons: [
+        {
+          text: 'Close',
+          className: 'btn-alert-secondary'
+        }
+      ]
+    });
+  } finally {
+    reportSubmitBtn.disabled = false;
+    reportSubmitBtn.textContent = originalText;
+  }
+});
+
+// Reset border color on input change
+reportReason.addEventListener('change', () => {
+  reportReason.style.borderColor = 'var(--border)';
+});
 
 loadData();
 </script>

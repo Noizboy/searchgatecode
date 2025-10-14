@@ -619,6 +619,14 @@ foreach ($data as $community) {
   }
 }
 
+// Calculate search statistics
+$searches_file = __DIR__ . '/../data/searches.json';
+$total_searches = 0;
+if (file_exists($searches_file)) {
+  $searches_data = json_decode(file_get_contents($searches_file), true) ?: [];
+  $total_searches = count($searches_data);
+}
+
 function match_row($row,$q){
   if($q==='') return true;
   $q = norm($q);
@@ -947,17 +955,6 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     box-shadow: 0 6px 18px rgba(255, 92, 92, .55);
   }
 
-  .btn-clear-reports {
-    background: linear-gradient(135deg, #FFA726, #FB8C00);
-    border: 0;
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(255, 167, 38, .4);
-  }
-
-  .btn-clear-reports:hover {
-    background: linear-gradient(135deg, #FB8C00, #F57C00);
-    box-shadow: 0 6px 18px rgba(255, 167, 38, .55);
-  }
 
   .btn-group {
     display: flex;
@@ -1353,8 +1350,9 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
   .content-body {
     flex: 1;
-    padding: 32px 32px 60px 32px;
-    overflow: hidden;
+    padding: 32px 32px 100px 32px;
+    overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -1477,7 +1475,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     }
 
     .content-body {
-      padding: 20px;
+      padding: 20px 20px 100px 20px;
     }
 
     .page-header {
@@ -1632,10 +1630,11 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     background: linear-gradient(180deg, var(--panel), var(--panel-2));
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 32px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     text-align: center;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
@@ -1672,19 +1671,19 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   }
 
   .stat-icon {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
     background: linear-gradient(135deg, rgba(59, 221, 130, 0.15), rgba(27, 191, 103, 0.1));
   }
 
   .stat-icon svg {
-    width: 28px;
-    height: 28px;
+    width: 40px;
+    height: 40px;
     fill: var(--brand);
   }
 
@@ -1697,10 +1696,10 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   }
 
   .stat-number {
-    font-size: 2rem;
+    font-size: 3rem;
     font-weight: 800;
     color: var(--brand);
-    margin: 6px 0;
+    margin: 12px 0;
     line-height: 1;
   }
 
@@ -1709,10 +1708,10 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   }
 
   .stat-label {
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     color: var(--muted);
     font-weight: 600;
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .stat-button {
@@ -1837,7 +1836,18 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="stat-number danger"><?= $total_reported ?></div>
         <div class="stat-label">Reported Codes</div>
-        <button class="stat-button danger" onclick="showReportedCodes()">View Codes</button>
+        <a href="communities.php?key=<?= urlencode(ADMIN_KEY) ?>&filter=reported" class="stat-button danger" style="display: inline-block; text-decoration: none; text-align: center;">View Codes</a>
+      </div>
+
+      <!-- Total Searches -->
+      <div class="stat-card">
+        <div class="stat-icon">
+          <svg fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="stat-number"><?= number_format($total_searches) ?></div>
+        <div class="stat-label">Total Searches</div>
       </div>
     </div>
 
@@ -2085,18 +2095,6 @@ require_once __DIR__ . '/includes/sidebar.php';
   </div>
 </div>
 
-<!-- REPORTED CODES MODAL -->
-<div id="reportedCodesModal" class="edit-modal">
-  <div class="edit-modal-content">
-    <div class="edit-modal-header">
-      <h2>Códigos Reportados</h2>
-      <button class="btn" id="closeReportedModal">✕</button>
-    </div>
-    <div class="edit-modal-body" style="max-height: 60vh; overflow-y: auto;">
-      <div id="reportedCodesList"></div>
-    </div>
-  </div>
-</div>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
 
@@ -3380,290 +3378,6 @@ document.addEventListener('click', function(e) {
         document.body.removeChild(deleteCodeModal);
         document.body.style.overflow = '';
       }
-    });
-  }
-});
-
-// ==================== REPORTED CODES MODAL ====================
-
-window.showReportedCodes = function() {
-  const modal = document.getElementById('reportedCodesModal');
-  const list = document.getElementById('reportedCodesList');
-
-  if (!modal || !list) {
-    console.error('Reported Codes Modal elements not found');
-    return;
-  }
-
-  // Find all reported codes
-  const reportedCodes = [];
-  gatesData.forEach((community, commIdx) => {
-    if (community.codes && Array.isArray(community.codes)) {
-      const totalCodes = community.codes.length;
-      community.codes.forEach((code, codeIdx) => {
-        if (code.report_count && code.report_count > 0) {
-          reportedCodes.push({
-            communityIdx: commIdx,
-            communityName: community.community || '',
-            city: community.city || '',
-            codeIdx: codeIdx,
-            code: code.code || '',
-            notes: code.notes || '',
-            reportCount: code.report_count,
-            totalCodes: totalCodes
-          });
-        }
-      });
-    }
-  });
-
-  // Generate HTML
-  if (reportedCodes.length === 0) {
-    list.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">✓</div>
-        <p>No hay códigos reportados en este momento.</p>
-      </div>
-    `;
-  } else {
-    let html = '';
-    reportedCodes.forEach(item => {
-      html += `
-        <div style="background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
-            <div>
-              <h3 style="margin: 0 0 6px 0; font-size: 1.2rem; color: var(--text);">
-                ${escapeHtml(item.communityName)}
-                ${item.city ? `<span style="color: var(--muted); font-size: 0.95rem; font-weight: 400;"> · ${escapeHtml(item.city)}</span>` : ''}
-              </h3>
-              <p style="margin: 0; color: var(--muted); font-size: 0.95rem;">
-                Código: <strong style="color: var(--text); font-family: monospace; font-size: 1rem;">${escapeHtml(item.code)}</strong>
-                ${item.notes ? `<br><span style="font-size: 0.9rem;">Notas: ${escapeHtml(item.notes)}</span>` : ''}
-              </p>
-            </div>
-            <div style="background: var(--danger); color: white; padding: 6px 14px; border-radius: 14px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
-              ${item.reportCount} reporte${item.reportCount > 1 ? 's' : ''}
-            </div>
-          </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="btn btn-primary btn-edit-community-from-reported"
-                    data-community-name="${escapeHtml(item.communityName)}">
-              Editar Comunidad
-            </button>
-            <button class="btn btn-danger btn-delete-code-from-reported"
-                    data-community-name="${escapeHtml(item.communityName)}"
-                    data-code="${escapeHtml(item.code)}"
-                    data-total-codes="${item.totalCodes}">
-              Eliminar Código
-            </button>
-            <button class="btn btn-clear-reports"
-                    data-community-idx="${item.communityIdx}"
-                    data-code-idx="${item.codeIdx}">
-              Limpiar Reportes
-            </button>
-          </div>
-        </div>
-      `;
-    });
-    list.innerHTML = html;
-  }
-
-  // Show modal
-  modal.classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-// Close button
-document.getElementById('closeReportedModal')?.addEventListener('click', () => {
-  const modal = document.getElementById('reportedCodesModal');
-  if (modal) {
-    modal.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-});
-
-// Close on background click
-document.getElementById('reportedCodesModal')?.addEventListener('click', (e) => {
-  if (e.target.id === 'reportedCodesModal') {
-    e.target.classList.remove('open');
-    document.body.style.overflow = '';
-  }
-});
-
-// Edit Community button
-document.addEventListener('click', (e) => {
-  const editBtn = e.target.closest('.btn-edit-community-from-reported');
-  if (editBtn) {
-    const communityName = editBtn.getAttribute('data-community-name');
-
-    // Close reported modal
-    const modal = document.getElementById('reportedCodesModal');
-    if (modal) {
-      modal.classList.remove('open');
-      document.body.style.overflow = '';
-    }
-
-    // Open edit modal
-    if (typeof openEditModal === 'function') {
-      openEditModal(communityName);
-    }
-  }
-});
-
-// Delete Code button
-document.addEventListener('click', async (e) => {
-  const deleteBtn = e.target.closest('.btn-delete-code-from-reported');
-  if (deleteBtn) {
-    const communityName = deleteBtn.getAttribute('data-community-name');
-    const code = deleteBtn.getAttribute('data-code');
-    const totalCodes = parseInt(deleteBtn.getAttribute('data-total-codes'));
-
-    // Warning if it's the last code
-    if (totalCodes === 1) {
-      showAlert({
-        type: 'warning',
-        title: 'No se puede eliminar',
-        message: 'No se puede eliminar el último código de una comunidad.\n\nCada comunidad debe tener al menos un código.\n\nSi deseas eliminar esta comunidad completamente, usa el botón "Editar Comunidad" y luego elimina la comunidad desde ahí.',
-        buttons: [
-          {
-            text: 'Entendido',
-            className: 'btn-alert-primary'
-          }
-        ]
-      });
-      return;
-    }
-
-    showAlert({
-      type: 'warning',
-      title: 'Eliminar Código',
-      message: `¿Eliminar el código "${code}" de "${communityName}"?\n\nEsta acción no se puede deshacer.`,
-      buttons: [
-        {
-          text: 'Cancelar',
-          className: 'btn-alert-secondary'
-        },
-        {
-          text: 'Eliminar',
-          className: 'btn-alert-danger',
-          onClick: async () => {
-            try {
-              const formData = new FormData();
-              formData.append('key', '<?= ADMIN_KEY ?>');
-              formData.append('action', 'delete_code');
-              formData.append('community', communityName);
-              formData.append('code', code);
-
-              const response = await fetch(window.location.href, {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: formData
-              });
-
-              const result = await response.json();
-
-              if (response.ok && result.success) {
-                location.reload();
-              } else {
-                showAlert({
-                  type: 'error',
-                  title: 'Error',
-                  message: result.message || 'No se pudo eliminar el código',
-                  buttons: [
-                    {
-                      text: 'OK',
-                      className: 'btn-alert-primary'
-                    }
-                  ]
-                });
-              }
-            } catch (error) {
-              console.error('Error:', error);
-              showAlert({
-                type: 'error',
-                title: 'Error de Conexión',
-                message: 'Error de conexión al eliminar el código',
-                buttons: [
-                  {
-                    text: 'OK',
-                    className: 'btn-alert-primary'
-                  }
-                ]
-              });
-            }
-          }
-        }
-      ]
-    });
-  }
-});
-
-// Clear Reports button
-document.addEventListener('click', async (e) => {
-  const clearBtn = e.target.closest('.btn-clear-reports');
-  if (clearBtn) {
-    const communityIdx = clearBtn.getAttribute('data-community-idx');
-    const codeIdx = clearBtn.getAttribute('data-code-idx');
-
-    showAlert({
-      type: 'warning',
-      title: 'Limpiar Reportes',
-      message: '¿Limpiar todos los reportes de este código?\n\nEl contador de reportes se reiniciará a 0.',
-      buttons: [
-        {
-          text: 'Cancelar',
-          className: 'btn-alert-secondary'
-        },
-        {
-          text: 'Limpiar',
-          className: 'btn-alert-primary',
-          onClick: async () => {
-            try {
-              const formData = new FormData();
-              formData.append('key', '<?= ADMIN_KEY ?>');
-              formData.append('action', 'clear_reports');
-              formData.append('community_idx', communityIdx);
-              formData.append('code_idx', codeIdx);
-
-              const response = await fetch(window.location.href, {
-                method: 'POST',
-                body: formData
-              });
-
-              const result = await response.json();
-
-              if (response.ok && result.success) {
-                location.reload();
-              } else {
-                showAlert({
-                  type: 'error',
-                  title: 'Error',
-                  message: result.message || 'No se pudieron limpiar los reportes',
-                  buttons: [
-                    {
-                      text: 'OK',
-                      className: 'btn-alert-primary'
-                    }
-                  ]
-                });
-              }
-            } catch (error) {
-              console.error('Error:', error);
-              showAlert({
-                type: 'error',
-                title: 'Error de Conexión',
-                message: 'Error de conexión al limpiar reportes',
-                buttons: [
-                  {
-                    text: 'OK',
-                    className: 'btn-alert-primary'
-                  }
-                ]
-              });
-            }
-          }
-        }
-      ]
     });
   }
 });

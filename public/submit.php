@@ -28,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codes = [];
     $codeInputs = $_POST['code'] ?? [];
     $notesInputs = $_POST['notes'] ?? [];
-    $detailsInputs = $_POST['details'] ?? [];
     $photoInputs = $_POST['photo'] ?? [];
     $coordinatesInputs = $_POST['coordinates'] ?? [];
 
@@ -38,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $codeData = [
           'code' => $codeVal,
           'notes' => trim($notesInputs[$idx] ?? ''),
-          'details' => trim($detailsInputs[$idx] ?? ''),
           'photo' => trim($photoInputs[$idx] ?? '')
         ];
 
@@ -394,7 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   /* Theme Toggle Button */
   .theme-toggle {
-    position: fixed;
+    position: absolute;
     top: 20px;
     right: 20px;
     background: var(--panel);
@@ -422,6 +420,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   .theme-toggle:hover svg {
     transform: rotate(20deg);
+  }
+
+  main {
+    position: relative;
   }
 
   /* Modal Backdrop */
@@ -996,11 +998,6 @@ function createCodeItem(index) {
         <label class="form-label">Notes</label>
         <input type="text" class="field" name="notes[]" placeholder="e.g., Main entrance">
       </div>
-    </div>
-
-    <div class="form-group code-full">
-      <label class="form-label">Details</label>
-      <textarea class="field" name="details[]" placeholder="Additional details about this gate code..."></textarea>
     </div>
 
     <div class="form-group code-full">

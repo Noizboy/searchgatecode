@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(C:\\xampp\\php\\php.exe -l:*)"
+      "Bash(C:\\xampp\\php\\php.exe -l:*)",
+      "Bash(php:*)",
+      "Bash(\"C:\\xampp\\php\\php.exe\" -r \"\n$file = ''c:/xampp/htdocs/gatecodes/data/gates.json'';\n$data = json_decode(file_get_contents($file), true);\nforeach ($data as &$community) {\n    if (isset($community[''codes''])) {\n        foreach ($community[''codes''] as &$code) {\n            unset($code[''details'']);\n        }\n    }\n}\nfile_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));\necho ''Details removed from gates.json'';\n\")",
+      "Bash(C:\\xampp\\php\\php.exe:*)"
     ],
     "deny": [],
     "ask": []

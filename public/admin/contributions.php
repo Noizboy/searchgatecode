@@ -40,7 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $newCode = [
             'code' => trim($codeData['code'] ?? ''),
             'notes' => trim($codeData['notes'] ?? ''),
-            'details' => trim($codeData['details'] ?? ''),
             'photo' => trim($codeData['photo'] ?? '')
           ];
 
@@ -190,7 +189,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Update codes
         $codeInputs = $_POST['code'] ?? [];
         $notesInputs = $_POST['notes'] ?? [];
-        $detailsInputs = $_POST['details'] ?? [];
         $photoInputs = $_POST['photo'] ?? [];
         $coordinatesInputs = $_POST['coordinates'] ?? [];
 
@@ -201,7 +199,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $codeData = [
               'code' => $codeVal,
               'notes' => trim($notesInputs[$idx] ?? ''),
-              'details' => trim($detailsInputs[$idx] ?? ''),
               'photo' => trim($photoInputs[$idx] ?? '')
             ];
 
@@ -349,6 +346,7 @@ require_once __DIR__ . '/includes/header.php';
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
+  padding-bottom: 100px;
   min-height: 0;
 }
 
@@ -932,11 +930,6 @@ function addEditCodeItem(codeData = null) {
         <label class="form-label">Notes</label>
         <input type="text" class="field" name="notes[]" value="${escapeHtml(code.notes || '')}">
       </div>
-    </div>
-
-    <div class="form-group code-full">
-      <label class="form-label">Details</label>
-      <textarea class="field" name="details[]">${escapeHtml(code.details || '')}</textarea>
     </div>
 
     <input type="hidden" name="photo[]" value="${escapeHtml(code.photo || '')}">

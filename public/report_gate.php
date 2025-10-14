@@ -12,6 +12,7 @@ if (!$data || !isset($data['community']) || !isset($data['code'])) {
 
 $community = $data['community'];
 $code = $data['code'];
+$reason = isset($data['reason']) ? trim($data['reason']) : '';
 
 // Load gates.json
 $jsonFile = 'data/gates.json';
@@ -42,6 +43,22 @@ foreach ($gates as &$gate) {
 
                 // Update last_report_at timestamp
                 $codeObj['last_report_at'] = date('c'); // ISO 8601 format
+
+                // Store report reasons in an array
+                if (!isset($codeObj['report_reasons'])) {
+                    $codeObj['report_reasons'] = [];
+                }
+
+                // Add new report with reason and timestamp
+                $codeObj['report_reasons'][] = [
+                    'reason' => $reason,
+                    'reported_at' => date('c')
+                ];
+
+                // Store last reason for quick access
+                if (!empty($reason)) {
+                    $codeObj['last_report_reason'] = $reason;
+                }
 
                 $found = true;
                 break 2;

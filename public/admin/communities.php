@@ -222,7 +222,7 @@ if ($action === 'add') {
       $code = trim($r['code'] ?? '');
       if($code==='') continue;
       $entry = ['code'=>$code];
-      foreach(['notes','details','photo'] as $k){
+      foreach(['notes','photo'] as $k){
         $v=trim($r[$k]??'');
         if($k==='photo'){
           if($v==='' || $v===DEFAULT_THUMB_URL){
@@ -330,7 +330,7 @@ if ($action === 'update') {
     foreach($rows as $r){
       $code=trim($r['code']??''); if($code==='') continue;
       $entry=['code'=>$code];
-      foreach(['notes','details','photo'] as $k){
+      foreach(['notes','photo'] as $k){
         $v=trim($r[$k]??'');
         if($k==='photo' && $v===''){
           $v = $existing_photo ?? DEFAULT_THUMB_URL;
@@ -471,7 +471,6 @@ if ($action === 'approve_contribution') {
     $new_code = [
       'code' => $suggestion['code'] ?? '',
       'notes' => $suggestion['notes'] ?? '',
-      'details' => $suggestion['details'] ?? '',
       'photo' => $new_photo ?: DEFAULT_THUMB_URL
     ];
 
@@ -1288,10 +1287,37 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
   .search-bar-container {
     display: flex;
     gap: 12px;
+    align-items: center;
   }
 
   .search-bar-container .field {
     flex: 1;
+  }
+
+  .search-bar-container .btn {
+    flex-shrink: 0;
+  }
+
+  .filter-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .filter-btn.active {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: #fff;
+    border-color: var(--brand);
+    box-shadow: 0 4px 12px rgba(59, 221, 130, .3);
+  }
+
+  .filter-btn.active svg {
+    stroke: #fff;
+  }
+
+  .filter-btn:not(.active):hover {
+    border-color: var(--brand);
   }
 
   /* COMMUNITIES CARD - SCROLLABLE BOX */
@@ -1332,7 +1358,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 
   .content-body {
     flex: 1;
-    padding: 32px 32px 60px 32px;
+    padding: 32px 32px 80px 32px;
     overflow: hidden;
     min-height: 0;
     display: flex;
@@ -1456,7 +1482,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     }
 
     .content-body {
-      padding: 20px;
+      padding: 20px 20px 80px 20px;
     }
 
     .page-header {
@@ -1497,12 +1523,7 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     }
 
     .search-bar-container {
-      flex-direction: column;
       gap: 8px;
-    }
-
-    .search-bar-container .btn {
-      width: 100%;
     }
 
     .code-edit-row {
@@ -1755,6 +1776,37 @@ require_once __DIR__ . '/includes/sidebar.php';
           <input type="text" class="field" id="searchInput" placeholder="Search by community or code..." value="<?= htmlspecialchars($q) ?>">
           <button class="btn btn-primary" id="searchBtn">Search</button>
         </div>
+        <div class="filter-buttons" style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+          <button class="btn filter-btn" id="filterAll" data-filter="all">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+            All
+          </button>
+          <button class="btn filter-btn" id="filterNoGPS" data-filter="no-gps">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            No GPS
+          </button>
+          <button class="btn filter-btn" id="filterDefaultImg" data-filter="default-img">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            Default Image
+          </button>
+          <button class="btn filter-btn" id="filterReported" data-filter="reported">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Reported
+          </button>
+        </div>
       </div>
 
       <!-- COMMUNITIES CARD - SCROLLABLE -->
@@ -1766,22 +1818,58 @@ require_once __DIR__ . '/includes/sidebar.php';
               <div class="empty-state-icon">📭</div>
               <p>No communities found.</p>
             </div>
-          <?php else: foreach($filtered as $row): ?>
-            <div class="community-item">
+          <?php else: foreach($filtered as $row):
+            // Check GPS coordinates
+            $has_coords = isset($row['coordinates']) &&
+                          isset($row['coordinates']['latitude']) &&
+                          isset($row['coordinates']['longitude']) &&
+                          $row['coordinates']['latitude'] !== null &&
+                          $row['coordinates']['longitude'] !== null;
+
+            // Check if all codes use default image
+            $has_default_img = false;
+            foreach(($row['codes']??[]) as $code) {
+              $photo = trim($code['photo'] ?? '');
+              if (empty($photo) ||
+                  $photo === 'assets/thumbnailnone.png' ||
+                  $photo === 'assets/gate-call-box-residential.jpg' ||
+                  stripos($photo, 'thumbnailnone') !== false ||
+                  stripos($photo, 'gate-call-box-residential') !== false) {
+                $has_default_img = true;
+                break;
+              }
+            }
+
+            // Check if any code has been reported
+            $has_reported = false;
+            foreach(($row['codes']??[]) as $code) {
+              if (isset($code['report_count']) && $code['report_count'] > 0) {
+                $has_reported = true;
+                break;
+              }
+            }
+          ?>
+            <div class="community-item" data-has-gps="<?= $has_coords ? '1' : '0' ?>" data-has-default-img="<?= $has_default_img ? '1' : '0' ?>" data-has-reported="<?= $has_reported ? '1' : '0' ?>">
               <div class="community-header">
                 <div class="community-name">
                   <?= htmlspecialchars($row['community']) ?>
                   <?php if (!empty($row['city'])): ?>
                     <span style="color: var(--muted); font-weight: 500;"> - <?= htmlspecialchars($row['city']) ?></span>
                   <?php endif; ?>
+                  <?php if (!$has_coords): ?>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; vertical-align: middle;" title="No GPS coordinates">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                  <?php endif; ?>
                 </div>
                 <div class="btn-group">
                   <button class="btn btn-edit-comm" data-community="<?= htmlspecialchars($row['community']) ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                     </svg>
-                    View
+                    Edit
                   </button>
                 </div>
               </div>
@@ -1792,12 +1880,18 @@ require_once __DIR__ . '/includes/sidebar.php';
                   <div class="code-item">
                     <img class="code-thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
                     <div class="code-info">
-                      <div class="code-value"><?= htmlspecialchars($code['code'] ?? '') ?></div>
+                      <div class="code-value">
+                        <?= htmlspecialchars($code['code'] ?? '') ?>
+                        <?php if(isset($code['report_count']) && $code['report_count'] > 0): ?>
+                          <svg class="report-warning-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; vertical-align: middle; cursor: pointer;" data-report-log='<?= htmlspecialchars(json_encode($code['report_reasons'] ?? []), ENT_QUOTES) ?>' title="<?= $code['report_count'] ?> report(s)">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                        <?php endif; ?>
+                      </div>
                       <?php if(!empty($code['notes'])): ?>
                         <div class="code-note"><?= htmlspecialchars($code['notes']) ?></div>
-                      <?php endif; ?>
-                      <?php if(!empty($code['details'])): ?>
-                        <div class="code-note"><?= htmlspecialchars($code['details']) ?></div>
                       <?php endif; ?>
                     </div>
                   </div>
@@ -1813,7 +1907,7 @@ require_once __DIR__ . '/includes/sidebar.php';
     <!-- ADD NEW SECTION -->
     <section id="add-new-section" class="section" style="display: none;">
       <div class="card">
-        <h2 class="card-title">Add New Community</h2>
+        <h2 class="card-title">Add Community</h2>
 
         <form method="post" id="addForm">
           <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
@@ -1882,10 +1976,6 @@ require_once __DIR__ . '/includes/sidebar.php';
               }
             ?>
               <img class="suggestion-photo js-open-modal" src="<?= htmlspecialchars($photo_url) ?>" alt="Photo" data-full="<?= htmlspecialchars($photo_url) ?>">
-            <?php endif; ?>
-
-            <?php if(!empty($suggestion['details'])): ?>
-              <p style="margin: 12px 0 0 0; color: var(--text);"><?= htmlspecialchars($suggestion['details']) ?></p>
             <?php endif; ?>
           </div>
         <?php endforeach; endif; ?>
@@ -1978,6 +2068,19 @@ require_once __DIR__ . '/includes/sidebar.php';
   <img id="imgModalPic" src="" alt="photo">
 </div>
 
+<!-- REPORT LOG MODAL -->
+<div id="reportLogModal" class="modal" style="align-items: center; justify-content: center; z-index: 10000;">
+  <div style="background: var(--panel-2); border-radius: 16px; max-width: 600px; width: 90%; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+    <div style="padding: 24px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 1.4rem; color: var(--text);">Report Log</h2>
+      <button class="btn" id="closeReportLogModal" type="button">✕</button>
+    </div>
+    <div id="reportLogContent" style="padding: 24px; overflow-y: auto; flex: 1;">
+      <!-- Report log content will be inserted here -->
+    </div>
+  </div>
+</div>
+
 <!-- EDIT COMMUNITY MODAL -->
 <div id="editModal" class="edit-modal">
   <div class="edit-modal-content">
@@ -2015,7 +2118,16 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
 
         <div class="form-group" style="margin-bottom: 20px;">
-          <label class="form-label">GPS Coordinates (optional)</label>
+          <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span>GPS Coordinates (optional)</span>
+            <a href="#" id="openMapPicker" style="color: var(--brand); text-decoration: none; font-size: 0.9rem; font-weight: 500;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              Pick on Map
+            </a>
+          </label>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <input type="text" class="field" name="latitude" id="editLatitude" placeholder="Latitude (e.g., 28.5383)">
             <input type="text" class="field" name="longitude" id="editLongitude" placeholder="Longitude (e.g., -81.3792)">
@@ -2044,11 +2156,11 @@ require_once __DIR__ . '/includes/sidebar.php';
   </div>
 </div>
 
-<!-- ADD NEW COMMUNITY MODAL -->
+<!-- ADD COMMUNITY MODAL -->
 <div id="addNewModal" class="edit-modal">
   <div class="edit-modal-content">
     <div class="edit-modal-header">
-      <h2>Add New Community</h2>
+      <h2>Add Community</h2>
       <button class="btn" id="closeAddNewModal" type="button">✕</button>
     </div>
     <div class="edit-modal-body">
@@ -2152,6 +2264,162 @@ searchInput.addEventListener('keypress', (e) => {
   }
 });
 
+// FILTER BUTTONS
+let currentFilter = 'all';
+const filterBtns = document.querySelectorAll('.filter-btn');
+const communityItems = document.querySelectorAll('.community-item');
+
+// Check URL parameter for filter
+const urlParams = new URLSearchParams(window.location.search);
+const urlFilter = urlParams.get('filter');
+if (urlFilter && ['all', 'no-gps', 'default-img', 'reported'].includes(urlFilter)) {
+  currentFilter = urlFilter;
+}
+
+// Set initial active state
+const initialBtn = currentFilter === 'all' ? document.getElementById('filterAll') :
+                   currentFilter === 'no-gps' ? document.getElementById('filterNoGPS') :
+                   currentFilter === 'default-img' ? document.getElementById('filterDefaultImg') :
+                   currentFilter === 'reported' ? document.getElementById('filterReported') :
+                   document.getElementById('filterAll');
+
+if (initialBtn) {
+  initialBtn.classList.add('active');
+  if (currentFilter !== 'all') {
+    applyFilter(currentFilter);
+  }
+}
+
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const filter = btn.dataset.filter;
+    currentFilter = filter;
+
+    // Update active button
+    filterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Apply filter
+    applyFilter(filter);
+  });
+});
+
+function applyFilter(filter) {
+  let visibleCount = 0;
+
+  communityItems.forEach(item => {
+    let show = true;
+
+    if (filter === 'no-gps') {
+      show = item.dataset.hasGps === '0';
+    } else if (filter === 'default-img') {
+      show = item.dataset.hasDefaultImg === '1';
+    } else if (filter === 'reported') {
+      show = item.dataset.hasReported === '1';
+    }
+
+    item.style.display = show ? 'block' : 'none';
+    if (show) visibleCount++;
+  });
+
+  // Show empty state if no results
+  const emptyState = document.querySelector('.empty-state');
+  if (visibleCount === 0 && !emptyState) {
+    const grid = document.getElementById('communitiesList');
+    grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>No communities match this filter.</p></div>';
+  } else if (visibleCount > 0 && emptyState) {
+    location.reload(); // Reload to show communities again
+  }
+}
+
+// REPORT LOG MODAL
+const reportLogModal = document.getElementById('reportLogModal');
+const reportLogContent = document.getElementById('reportLogContent');
+const closeReportLogBtn = document.getElementById('closeReportLogModal');
+
+function openReportLogModal(reportLog) {
+  if (!reportLog || reportLog.length === 0) {
+    reportLogContent.innerHTML = '<div style="text-align: center; padding: 40px 20px;"><p style="color: var(--muted); font-size: 1rem;">No reports recorded.</p></div>';
+  } else {
+    let html = '<ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">';
+
+    const reasonLabels = {
+      'incorrect': 'Code is incorrect',
+      'outdated': 'Code is outdated/changed',
+      'not_working': 'Code not working anymore',
+      'wrong_community': 'Wrong community assigned',
+      'duplicate': 'Duplicate entry',
+      'other': 'Other reason'
+    };
+
+    reportLog.forEach((report, idx) => {
+      const reasonText = reasonLabels[report.reason] || report.reason || 'Unknown';
+      const date = new Date(report.reported_at);
+      const dateStr = date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      html += `
+        <li style="background: rgba(0,0,0,0.3); padding: 18px; border-radius: 12px; border-left: 4px solid #e53935; display: flex; align-items: start; gap: 16px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.2)'">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; background: linear-gradient(135deg, #e53935, #c62828); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(229, 57, 53, 0.4);">
+            ${reportLog.length - idx}
+          </div>
+          <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <span style="font-weight: 600; color: var(--text); font-size: 1rem;">Report #${reportLog.length - idx}</span>
+              <span style="font-size: 0.85rem; color: var(--muted); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px;">${dateStr}</span>
+            </div>
+            <div style="color: var(--text); font-size: 0.95rem;">
+              <strong>Reason:</strong> ${reasonText}
+            </div>
+          </div>
+        </li>
+      `;
+    });
+
+    html += '</ul>';
+    reportLogContent.innerHTML = html;
+  }
+
+  reportLogModal.classList.add('open');
+  reportLogModal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeReportLogModal() {
+  reportLogModal.classList.remove('open');
+  reportLogModal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+closeReportLogBtn.addEventListener('click', closeReportLogModal);
+
+reportLogModal.addEventListener('click', (e) => {
+  if (e.target === reportLogModal) {
+    closeReportLogModal();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && reportLogModal.classList.contains('open')) {
+    closeReportLogModal();
+  }
+});
+
+// Handle warning icon clicks
+document.addEventListener('click', (e) => {
+  const icon = e.target.closest('.report-warning-icon');
+  if (icon) {
+    e.stopPropagation();
+    const reportLog = JSON.parse(icon.getAttribute('data-report-log') || '[]');
+    openReportLogModal(reportLog);
+  }
+});
+
 // ADD CODE ROWS (for Add New section)
 let codeIndex = 0;
 
@@ -2166,10 +2434,6 @@ function createCodeRow(index) {
     <div class="form-group">
       <label class="form-label">Notes</label>
       <input type="text" class="field" name="codes[${index}][notes]" placeholder="e.g., Main entrance">
-    </div>
-    <div class="form-group full-width">
-      <label class="form-label">Details</label>
-      <textarea class="field" name="codes[${index}][details]" placeholder="Additional details"></textarea>
     </div>
     <div class="form-group full-width">
       <label class="form-label">Photo (JPG/PNG/WebP/HEIC)</label>
@@ -2606,12 +2870,25 @@ function addEditCodeRow(codeData = null) {
   const photoUrl = codeData?.photo ? `<?= ASSETS_URL ?>${codeData.photo.replace('assets/', '')}` : '';
   const code = codeData?.code || '';
   const notes = codeData?.notes || '';
-  const details = codeData?.details || '';
   const photo = codeData?.photo || '';
+  const reportCount = codeData?.report_count || 0;
+  const reportReasons = codeData?.report_reasons || [];
+  const reportLogJson = JSON.stringify(reportReasons).replace(/"/g, '&quot;');
+
+  let warningIconHtml = '';
+  if (reportCount > 0) {
+    warningIconHtml = `
+      <svg class="report-warning-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; vertical-align: middle; cursor: pointer;" data-report-log="${reportLogJson}" title="${reportCount} report(s)">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    `;
+  }
 
   div.innerHTML = `
     <div class="edit-code-header">
-      <strong style="color: var(--text);">Code #${index + 1}</strong>
+      <strong style="color: var(--text);">Code #${index + 1} ${warningIconHtml}</strong>
       <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${index}" title="Remove Code">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/>
@@ -2629,10 +2906,6 @@ function addEditCodeRow(codeData = null) {
       <div class="form-group">
         <label class="form-label">Notes</label>
         <input type="text" class="field" name="codes[${index}][notes]" value="${escapeHtml(notes)}" placeholder="e.g., Main entrance">
-      </div>
-      <div class="form-group edit-code-full">
-        <label class="form-label">Details</label>
-        <textarea class="field" name="codes[${index}][details]" placeholder="Additional details">${escapeHtml(details)}</textarea>
       </div>
       <div class="form-group edit-code-full">
         <label class="form-label">Photo</label>
@@ -2738,19 +3011,12 @@ saveEditModal.addEventListener('click', () => {
   }
 });
 
-// Close modal on background click
-editModal.addEventListener('click', (e) => {
-  if (e.target === editModal) {
-    closeEditModalFunc();
-  }
-});
-
-// Close modal on ESC
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && editModal.classList.contains('open')) {
-    closeEditModalFunc();
-  }
-});
+// Close modal on ESC disabled
+// document.addEventListener('keydown', (e) => {
+//   if (e.key === 'Escape' && editModal.classList.contains('open')) {
+//     closeEditModalFunc();
+//   }
+// });
 
 // Open edit modal when clicking Edit button
 document.addEventListener('click', (e) => {
@@ -2933,12 +3199,6 @@ function createAddNewCodeRow(index) {
         <input type="text" class="field" name="codes[${index}][notes]" placeholder="e.g., Main entrance">
       </div>
 
-      <!-- Details full width below -->
-      <div class="form-group edit-code-full">
-        <label class="form-label">Details</label>
-        <textarea class="field" name="codes[${index}][details]" placeholder="Additional details" rows="3"></textarea>
-      </div>
-
       <!-- Upload Photo full width below -->
       <div class="form-group edit-code-full">
         <label class="form-label">Upload Photo</label>
@@ -3034,9 +3294,20 @@ function addAddNewCodeRow(codeData = null) {
 
   removeBtn.addEventListener('click', () => {
     row.remove();
+    updateAddNewCodeNumbers();
   });
 
   addNewCodeIndex++;
+}
+
+function updateAddNewCodeNumbers() {
+  const codeItems = addNewCodesContainer.querySelectorAll('.edit-code-item');
+  codeItems.forEach((item, index) => {
+    const header = item.querySelector('.edit-code-header strong');
+    if (header) {
+      header.textContent = `Code #${index + 1}`;
+    }
+  });
 }
 
 openAddNewModalBtn.addEventListener('click', openAddNewModal);
@@ -3115,19 +3386,12 @@ saveAddNewModalBtn.addEventListener('click', () => {
   addNewForm.submit();
 });
 
-// Close modal on ESC
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && addNewModal.classList.contains('open')) {
-    closeAddNewModal();
-  }
-});
-
-// Close modal on overlay click
-addNewModal.addEventListener('click', (e) => {
-  if (e.target === addNewModal) {
-    closeAddNewModal();
-  }
-});
+// Close modal on ESC disabled
+// document.addEventListener('keydown', (e) => {
+//   if (e.key === 'Escape' && addNewModal.classList.contains('open')) {
+//     closeAddNewModal();
+//   }
+// });
 
 // Delete Community button - NATIVE POPUP
 document.addEventListener('click', function(e) {

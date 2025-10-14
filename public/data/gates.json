@@ -5,13 +5,11 @@
             {
                 "code": "#4578",
                 "notes": "Keypad at left lane",
-                "details": "Left lane keypad right before the speed bump. Watch for tight turn radius.",
                 "photo": "assets/gate_20251003_160316_2a4c80.jpg"
             },
             {
                 "code": "#4579",
                 "notes": "Back gate (contractors)",
-                "details": "Back entrance used by contractors. Keypad on a short pole; visibility is low at night.",
                 "photo": "assets/gate_20251003_160316_f1466c.jpg"
             }
         ],
@@ -28,7 +26,6 @@
             {
                 "code": "34564564",
                 "notes": "main",
-                "details": "ffgh345234",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -43,7 +40,6 @@
             {
                 "code": "*1143",
                 "notes": "Main Gate",
-                "details": "",
                 "photo": "assets/gate_20251001_114322_1e545c.jpg"
             }
         ],
@@ -74,7 +70,6 @@
             {
                 "code": "#5434",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -91,7 +86,6 @@
             {
                 "code": "1991#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -108,7 +102,6 @@
             {
                 "code": "1825",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -125,7 +118,6 @@
             {
                 "code": "2001",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -142,7 +134,6 @@
             {
                 "code": "1221* OR",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -173,7 +164,6 @@
             {
                 "code": "2020#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -190,9 +180,8 @@
             {
                 "code": "2525#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg",
-                "report_count": 1,
+                "report_count": 0,
                 "last_report_at": "2025-10-13T17:58:07+02:00"
             }
         ],
@@ -209,7 +198,6 @@
             {
                 "code": "1221#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -226,7 +214,6 @@
             {
                 "code": "0809",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -243,7 +230,6 @@
             {
                 "code": "#6271 OR #6221",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -260,7 +246,6 @@
             {
                 "code": "9842",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -277,12 +262,9 @@
             {
                 "code": "1960",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -294,7 +276,6 @@
             {
                 "code": "4545",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -311,7 +292,6 @@
             {
                 "code": "#9030",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -328,7 +308,6 @@
             {
                 "code": "#9687",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -345,7 +324,6 @@
             {
                 "code": "1276",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -362,7 +340,6 @@
             {
                 "code": "#4470",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -379,7 +356,6 @@
             {
                 "code": "#3710 OR #3700",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -396,7 +372,6 @@
             {
                 "code": "1557#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -413,7 +388,6 @@
             {
                 "code": "#8578",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -430,7 +404,6 @@
             {
                 "code": "0822#",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
@@ -452,7 +425,6 @@
             {
                 "code": "34534534",
                 "notes": "nuevonuevo",
-                "details": "nuevonuevo",
                 "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg"
             },
             {
@@ -473,7 +445,6 @@
             {
                 "code": "5555",
                 "notes": "555",
-                "details": "555",
                 "photo": "assets/thumbnailnone.png"
             }
         ],
@@ -490,7 +461,6 @@
             {
                 "code": "555",
                 "notes": "5555",
-                "details": "555",
                 "photo": "assets/gate_20251008_004011_4567fc.jpg"
             }
         ],
@@ -507,7 +477,6 @@
             {
                 "code": "222",
                 "notes": "22",
-                "details": "",
                 "photo": "assets/thumbnailnone.png"
             }
         ],
@@ -524,7 +493,6 @@
             {
                 "code": "345",
                 "notes": "345",
-                "details": "345",
                 "photo": "assets/gate_20251009_161925_a24d83.jpg"
             }
         ],
@@ -539,7 +507,6 @@
             {
                 "code": "www",
                 "notes": "",
-                "details": "",
                 "photo": "assets/thumbnailnone.png"
             }
         ],
@@ -556,7 +523,6 @@
             {
                 "code": "45643562",
                 "notes": "orlando3254354",
-                "details": "orlando3254354",
                 "photo": "assets/gate_orlando3254354_20251014_052321.jpg"
             }
         ],
@@ -572,7 +538,6 @@
             {
                 "code": "asdsfsdf",
                 "notes": "Testeando",
-                "details": "Testeando",
                 "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg"
             }
         ],
@@ -589,7 +554,6 @@
             {
                 "code": "1111",
                 "notes": "main entrance",
-                "details": "55345",
                 "photo": "assets/temp_gate_20251009_224631_96bdfb.jpg"
             }
         ],

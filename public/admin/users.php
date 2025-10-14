@@ -176,6 +176,7 @@ require_once __DIR__ . '/includes/header.php';
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
+  padding-bottom: 100px;
   min-height: 0;
 }
 
