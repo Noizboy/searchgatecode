@@ -776,12 +776,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <a href="index.php" class="title">Gate Codes</a>
     <div class="sub">Submit a new community gate code</div>
 
-    <?php if ($flashMsg): ?>
-      <div class="alert alert-success"><?= htmlspecialchars($flashMsg) ?></div>
-    <?php endif; ?>
-
     <?php if ($errorMsg): ?>
       <div class="alert alert-error"><?= htmlspecialchars($errorMsg) ?></div>
+    <?php endif; ?>
+
+    <!-- Hidden flash message data for modal -->
+    <?php if ($flashMsg): ?>
+      <div id="flashMessage" data-message="<?= htmlspecialchars($flashMsg) ?>" style="display: none;"></div>
     <?php endif; ?>
 
     <form class="form-container" method="POST" id="submitForm">
@@ -904,6 +905,29 @@ alertBackdrop.addEventListener('click', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && alertBackdrop.classList.contains('open')) closeAlert();
 });
+
+// Show flash message on load
+const flashMessage = document.getElementById('flashMessage');
+if (flashMessage) {
+  const message = flashMessage.getAttribute('data-message');
+  if (message) {
+    setTimeout(() => {
+      showAlert({
+        type: 'success',
+        title: 'Submission Successful',
+        message: message,
+        buttons: [{
+          text: 'OK',
+          className: 'btn-alert-primary',
+          onClick: () => {
+            // Redirect to clean URL after successful submission
+            window.location.href = 'submit.php';
+          }
+        }]
+      });
+    }, 100);
+  }
+}
 
 // Theme Toggle Functionality
 const themeToggle = document.getElementById('themeToggle');

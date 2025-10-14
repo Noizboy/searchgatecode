@@ -91,11 +91,23 @@ const flashMessage = document.getElementById('flashMessage');
 if (flashMessage) {
   const message = flashMessage.getAttribute('data-message');
   if (message) {
-    setTimeout(() => showAlert({
-      type: 'success',
-      title: 'Success',
-      message: message
-    }), 100);
+    setTimeout(() => {
+      showAlert({
+        type: 'success',
+        title: 'Success',
+        message: message,
+        buttons: [{
+          text: 'OK',
+          className: 'btn-alert-primary',
+          onClick: () => {
+            // Remove flash parameter from URL after closing
+            const url = new URL(window.location);
+            url.searchParams.delete('flash');
+            window.history.replaceState({}, '', url);
+          }
+        }]
+      });
+    }, 100);
   }
 }
 

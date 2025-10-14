@@ -159,12 +159,9 @@
             {
                 "code": "#9339",
                 "notes": "Main entrance",
-                "details": "",
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -457,6 +454,11 @@
                 "notes": "nuevonuevo",
                 "details": "nuevonuevo",
                 "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg"
+            },
+            {
+                "code": "nuevonue",
+                "notes": "nuevonuevo",
+                "photo": "assets/temp_gate_20251009_222846_5fb7d5.jpg"
             }
         ],
         "city": "nuevonuevo",
@@ -524,22 +526,8 @@
                 "notes": "345",
                 "details": "345",
                 "photo": "assets/gate_20251009_161925_a24d83.jpg"
-            },
-            {
-                "code": "456456",
-                "notes": "4645645",
-                "details": "4564",
-                "photo": "assets/gate_20251009_161925_a24d83.jpg"
-            },
-            {
-                "code": "678678",
-                "notes": "5645",
-                "details": "6456",
-                "photo": "assets/gate_20251009_162101_64288f.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -563,46 +551,16 @@
         }
     },
     {
-        "community": "holahola",
+        "community": "orlando325435421",
         "codes": [
             {
-                "code": "holahola",
-                "notes": "holahola",
-                "details": "holahola",
-                "photo": "assets/gate_holahola_20251009_214755.jpg"
-            },
-            {
-                "code": "holahola",
-                "notes": "holahola2",
-                "details": "holahola2",
-                "photo": "assets/thumbnailnone.png"
-            },
-            {
-                "code": "yasabe",
-                "notes": "yasabe",
-                "details": "yasabe",
-                "photo": "assets/gate_holahola_20251009_214755.jpg"
-            }
-        ],
-        "city": "",
-        "submitted_date": "",
-        "coordinates": {
-            "latitude": null,
-            "longitude": null
-        }
-    },
-    {
-        "community": "orlando3254354",
-        "codes": [
-            {
-                "code": "orlando3254354",
+                "code": "45643562",
                 "notes": "orlando3254354",
                 "details": "orlando3254354",
-                "photo": ""
+                "photo": "assets/gate_orlando3254354_20251014_052321.jpg"
             }
         ],
         "city": "orlando3254354",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -612,20 +570,18 @@
         "community": "Testeando22",
         "codes": [
             {
-                "code": "Testeando",
+                "code": "asdsfsdf",
                 "notes": "Testeando",
                 "details": "Testeando",
-                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg",
-                "report_count": 2,
-                "last_report_at": "2025-10-13T07:25:00+02:00"
+                "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg"
             }
         ],
         "city": "Testeando",
-        "submitted_date": "2025-10-09 22:31:32",
         "coordinates": {
             "latitude": 28.3217198,
             "longitude": -81.38180539999999
-        }
+        },
+        "http_url": "http://localhost/gatecodes/admin/communities.php?key=43982"
     },
     {
         "community": "santo",

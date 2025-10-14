@@ -1,117 +1,7 @@
 <?php
 /******************** CONFIG ********************/
-const ADMIN_KEY   = '43982';
-const APP_VERSION = '1.0.0';
-const GATES_JSON  = __DIR__ . '/../data/gates.json';
-const SUGGEST_JSON = __DIR__ . '/../data/suggest.json';
-const PIN_JSON = __DIR__ . '/../data/pin.json';
-const ASSETS_DIR  = __DIR__ . '/../assets/';
-const TEMP_ASSETS_DIR = __DIR__ . '/../temp_assets/';
-const DEFAULT_THUMB_FILE = 'thumbnailnone.png';
-
-$APP_URL = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/');
-define('ASSETS_URL', $APP_URL . '/assets/');
-define('TEMP_ASSETS_URL', $APP_URL . '/temp_assets/');
-define('ASSETS_RELATIVE', 'assets/');
-define('DEFAULT_THUMB_URL', ASSETS_RELATIVE . DEFAULT_THUMB_FILE);
-
-/* Minimal auth */
-function require_key(){
-  $k = $_GET['key'] ?? $_POST['key'] ?? '';
-  if ($k !== ADMIN_KEY) { http_response_code(403); exit('Forbidden'); }
-}
+require_once __DIR__ . '/includes/config.php';
 require_key();
-
-/******************** HELPERS ********************/
-function read_json($path){
-  if(!file_exists($path)) return [];
-  $h=fopen($path,'r'); if(!$h) return [];
-  flock($h,LOCK_SH); $s=stream_get_contents($h); flock($h,LOCK_UN); fclose($h);
-  $j=json_decode($s,true); return is_array($j)?$j:[];
-}
-
-function write_json($path,$data){
-  $dir = dirname($path);
-  if(!is_dir($dir)) @mkdir($dir, 0775, true);
-  $tmp=$path.'.tmp'; $h=fopen($tmp,'w'); if(!$h) return false;
-  flock($h,LOCK_EX); fwrite($h,json_encode($data,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
-  fflush($h); flock($h,LOCK_UN); fclose($h);
-  return @rename($tmp,$path);
-}
-
-function web_photo($p){
-  $p = trim((string)$p);
-  if ($p === '') return DEFAULT_THUMB_URL;
-  if (preg_match('#^(https?:)?//#', $p)) return $p;
-  if ($p[0] === '/') return $p;
-  $p = ltrim($p, './');
-  if (stripos($p, 'assets/') === 0) $p = substr($p, 7);
-  if (stripos($p, '../assets/') === 0) $p = substr($p, 10);
-  return ASSETS_URL . ltrim($p, '/');
-}
-
-function norm($s){
-  $s = mb_strtolower((string)$s, 'UTF-8');
-  $map = [
-    'á'=>'a','à'=>'a','ä'=>'a','â'=>'a','ã'=>'a','å'=>'a',
-    'é'=>'e','è'=>'e','ë'=>'e','ê'=>'e',
-    'í'=>'i','ì'=>'i','ï'=>'i','î'=>'i',
-    'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','õ'=>'o',
-    'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
-    'ñ'=>'n','ç'=>'c'
-  ];
-  $s = strtr($s, $map);
-  $s = preg_replace('/\s+/', ' ', $s);
-  return trim($s);
-}
-
-function find_comm_index(&$data,$community){
-  $q=norm($community);
-  foreach($data as $i=>$c){ if (norm($c['community'] ?? '') === $q) return $i; }
-  return -1;
-}
-
-function path_join($base, $rel){
-  $base = rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-  $rel = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
-  return $base . ltrim($rel, DIRECTORY_SEPARATOR);
-}
-
-function photo_url_to_path($url){
-  $url = trim((string)$url);
-  if ($url === '' || $url === DEFAULT_THUMB_URL) return '';
-  $pathPart = parse_url($url, PHP_URL_PATH);
-  if ($pathPart) {
-    if (strpos($pathPart, ASSETS_URL) === 0) {
-      $rel = substr($pathPart, strlen(ASSETS_URL));
-      $candidate = path_join(ASSETS_DIR, $rel);
-    } else {
-      $candidate = $pathPart;
-      if ($candidate !== '' && $candidate[0] !== DIRECTORY_SEPARATOR) {
-        $candidate = path_join(ASSETS_DIR, $candidate);
-      }
-    }
-  } else {
-    $candidate = path_join(ASSETS_DIR, $url);
-  }
-  $assetDirReal = realpath(ASSETS_DIR);
-  $fileReal = @realpath($candidate);
-  if ($fileReal === false) {
-    $dirReal = realpath(dirname($candidate));
-    if ($dirReal !== false) $fileReal = $dirReal . DIRECTORY_SEPARATOR . basename($candidate);
-  }
-  if ($fileReal === false || $assetDirReal === false) return '';
-  if (strpos($fileReal, $assetDirReal . DIRECTORY_SEPARATOR) !== 0 && $fileReal !== $assetDirReal) return '';
-  if (basename($fileReal) === DEFAULT_THUMB_FILE) return '';
-  return $fileReal;
-}
-
-function delete_photo_by_url($url){
-  $p = photo_url_to_path($url);
-  if ($p === '') return true;
-  if (!file_exists($p)) return true;
-  return @unlink($p);
-}
 
 /******************** GPS EXTRACTION HELPERS ********************/
 function getGPS($exifCoord, $hemi) {
@@ -470,14 +360,12 @@ if ($action === 'update') {
         $updatedCommunity['coordinates'] = $data[$idx]['coordinates'];
       }
 
-      // Handle HTTP URL
+      // Handle HTTP URL - only add if provided, remove if empty
       $http_url = trim($_POST['http_url'] ?? '');
       if ($http_url !== '') {
         $updatedCommunity['http_url'] = $http_url;
-      } elseif (isset($data[$idx]['http_url'])) {
-        // Preserve existing HTTP URL if not updated
-        $updatedCommunity['http_url'] = $data[$idx]['http_url'];
       }
+      // If empty, don't add the field - this effectively deletes it
 
       $data[$idx] = $updatedCommunity;
       write_json(GATES_JSON,$data);
@@ -2464,6 +2352,179 @@ const editCodeFiles = new Map();
 // Load gates.json data
 const gatesData = <?= json_encode($data) ?>;
 
+/**
+ * Extract GPS coordinates from EXIF data
+ */
+async function extractGPSFromImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const view = new DataView(e.target.result);
+
+        // Check for JPEG signature
+        if (view.getUint16(0, false) !== 0xFFD8) {
+          resolve(null);
+          return;
+        }
+
+        let offset = 2;
+        const length = view.byteLength;
+
+        while (offset < length) {
+          if (view.getUint16(offset, false) === 0xFFE1) {
+            // Found APP1 marker (EXIF)
+            const exifLength = view.getUint16(offset + 2, false);
+            const exifStart = offset + 4;
+
+            // Check for "Exif" string
+            if (view.getUint32(exifStart, false) !== 0x45786966) {
+              offset += 2 + exifLength;
+              continue;
+            }
+
+            const tiffOffset = exifStart + 6;
+            const littleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+
+            const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian) + tiffOffset;
+            const tags = view.getUint16(ifdOffset, littleEndian);
+
+            let gpsIfdOffset = null;
+
+            // Find GPS IFD pointer
+            for (let i = 0; i < tags; i++) {
+              const tagOffset = ifdOffset + 2 + (i * 12);
+              const tag = view.getUint16(tagOffset, littleEndian);
+
+              if (tag === 0x8825) { // GPS IFD tag
+                gpsIfdOffset = view.getUint32(tagOffset + 8, littleEndian) + tiffOffset;
+                break;
+              }
+            }
+
+            if (!gpsIfdOffset) {
+              resolve(null);
+              return;
+            }
+
+            // Parse GPS IFD
+            const gpsTags = view.getUint16(gpsIfdOffset, littleEndian);
+            let latRef = null, lat = null, lonRef = null, lon = null;
+
+            for (let i = 0; i < gpsTags; i++) {
+              const tagOffset = gpsIfdOffset + 2 + (i * 12);
+              const tag = view.getUint16(tagOffset, littleEndian);
+              const type = view.getUint16(tagOffset + 2, littleEndian);
+              const dataOffset = view.getUint32(tagOffset + 8, littleEndian) + tiffOffset;
+
+              if (tag === 1) { // GPSLatitudeRef
+                latRef = String.fromCharCode(view.getUint8(tagOffset + 8));
+              } else if (tag === 2) { // GPSLatitude
+                const d = view.getUint32(dataOffset, littleEndian) / view.getUint32(dataOffset + 4, littleEndian);
+                const m = view.getUint32(dataOffset + 8, littleEndian) / view.getUint32(dataOffset + 12, littleEndian);
+                const s = view.getUint32(dataOffset + 16, littleEndian) / view.getUint32(dataOffset + 20, littleEndian);
+                lat = d + m / 60 + s / 3600;
+              } else if (tag === 3) { // GPSLongitudeRef
+                lonRef = String.fromCharCode(view.getUint8(tagOffset + 8));
+              } else if (tag === 4) { // GPSLongitude
+                const d = view.getUint32(dataOffset, littleEndian) / view.getUint32(dataOffset + 4, littleEndian);
+                const m = view.getUint32(dataOffset + 8, littleEndian) / view.getUint32(dataOffset + 12, littleEndian);
+                const s = view.getUint32(dataOffset + 16, littleEndian) / view.getUint32(dataOffset + 20, littleEndian);
+                lon = d + m / 60 + s / 3600;
+              }
+            }
+
+            if (lat !== null && lon !== null) {
+              if (latRef === 'S') lat = -lat;
+              if (lonRef === 'W') lon = -lon;
+              resolve({ latitude: lat.toFixed(6), longitude: lon.toFixed(6) });
+              return;
+            }
+          }
+
+          offset += 2 + view.getUint16(offset + 2, false);
+        }
+
+        resolve(null);
+      } catch (err) {
+        console.error('Error extracting GPS:', err);
+        resolve(null);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
+ * Compress image before upload
+ * @param {File} file - Original image file
+ * @param {number} maxWidth - Maximum width in pixels (default: 1920)
+ * @param {number} maxHeight - Maximum height in pixels (default: 1920)
+ * @param {number} quality - JPEG quality 0-1 (default: 0.85)
+ * @returns {Promise<{file: File, coordinates: Object|null}>}
+ */
+async function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.85) {
+  return new Promise(async (resolve, reject) => {
+    // First extract GPS coordinates from original file
+    const coordinates = await extractGPSFromImage(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Calculate new dimensions
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw image
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to compress image'));
+            return;
+          }
+
+          // Create new file from blob
+          const compressedFile = new File([blob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now()
+          });
+
+          resolve({ file: compressedFile, coordinates });
+        }, 'image/jpeg', quality);
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = e.target.result;
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 function openEditModal(communityName) {
   const community = gatesData.find(c => c.community === communityName);
   if (!community) {
@@ -2601,15 +2662,25 @@ function wireEditCodeRow(row, index) {
     const file = e.target.files[0];
     if (!file) return;
 
-    status.textContent = 'Uploading...';
+    status.textContent = 'Compressing image...';
     status.style.color = 'var(--muted)';
 
-    const fd = new FormData();
-    fd.append('key', ADMIN_KEY);
-    fd.append('photo', file);
-    fd.append('community_name', editCommunityName.value);
-
     try {
+      // Compress image and extract GPS coordinates
+      const { file: compressedFile, coordinates: gpsCoords } = await compressImage(file);
+
+      // Show file size reduction
+      const originalSize = (file.size / 1024 / 1024).toFixed(2);
+      const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+      console.log(`Image compressed: ${originalSize}MB → ${compressedSize}MB`);
+
+      status.textContent = 'Uploading...';
+
+      const fd = new FormData();
+      fd.append('key', ADMIN_KEY);
+      fd.append('photo', compressedFile);
+      fd.append('community_name', editCommunityName.value);
+
       const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
         method: 'POST',
         body: fd
@@ -2622,15 +2693,21 @@ function wireEditCodeRow(row, index) {
         previewImg.src = result.url;
         preview.classList.add('show');
 
-        // Update coordinates if image has GPS and community doesn't have coordinates yet
+        // Update coordinates ONLY if both fields are currently empty
         const latInput = document.getElementById('editLatitude');
         const lonInput = document.getElementById('editLongitude');
-        if (result.coordinates && latInput && lonInput && (!latInput.value || !lonInput.value)) {
-          latInput.value = result.coordinates.latitude;
-          lonInput.value = result.coordinates.longitude;
-          status.textContent = 'Uploaded with GPS!';
+        const coords = gpsCoords || result.coordinates;
+
+        // Only extract GPS if BOTH coordinate fields are empty in the form
+        const bothFieldsEmpty = latInput && lonInput && !latInput.value.trim() && !lonInput.value.trim();
+
+        if (coords && bothFieldsEmpty) {
+          // Only update if image has valid coordinates
+          latInput.value = coords.latitude;
+          lonInput.value = coords.longitude;
+          status.textContent = `Uploaded with GPS! (${originalSize}MB → ${compressedSize}MB)`;
         } else {
-          status.textContent = 'Uploaded!';
+          status.textContent = `Uploaded! (${originalSize}MB → ${compressedSize}MB)`;
         }
         status.style.color = 'var(--brand)';
       } else {
@@ -2638,7 +2715,8 @@ function wireEditCodeRow(row, index) {
         status.style.color = 'var(--danger)';
       }
     } catch (error) {
-      status.textContent = 'Network error';
+      console.error('Error uploading:', error);
+      status.textContent = error.message || 'Network error';
       status.style.color = 'var(--danger)';
     }
   });
@@ -2890,18 +2968,28 @@ function addAddNewCodeRow(codeData = null) {
     const file = e.target.files[0];
     if (!file) return;
 
-    status.textContent = 'Uploading...';
+    status.textContent = 'Compressing image...';
     status.style.color = 'var(--muted)';
 
-    const fd = new FormData();
-    fd.append('key', ADMIN_KEY);
-    fd.append('photo', file);
-
-    if (addNewCommunityName.value.trim()) {
-      fd.append('community_name', addNewCommunityName.value.trim());
-    }
-
     try {
+      // Compress image and extract GPS coordinates
+      const { file: compressedFile, coordinates: gpsCoords } = await compressImage(file);
+
+      // Show file size reduction
+      const originalSize = (file.size / 1024 / 1024).toFixed(2);
+      const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+      console.log(`Image compressed: ${originalSize}MB → ${compressedSize}MB`);
+
+      status.textContent = 'Uploading...';
+
+      const fd = new FormData();
+      fd.append('key', ADMIN_KEY);
+      fd.append('photo', compressedFile);
+
+      if (addNewCommunityName.value.trim()) {
+        fd.append('community_name', addNewCommunityName.value.trim());
+      }
+
       const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
         method: 'POST',
         body: fd
@@ -2916,15 +3004,21 @@ function addAddNewCodeRow(codeData = null) {
         img.src = fullUrl;
         preview.style.display = 'block';
 
-        // Update coordinates if image has GPS and community doesn't have coordinates yet
+        // Update coordinates ONLY if both fields are currently empty
         const latInput = document.getElementById('addNewLatitude');
         const lonInput = document.getElementById('addNewLongitude');
-        if (result.coordinates && latInput && lonInput && (!latInput.value || !lonInput.value)) {
-          latInput.value = result.coordinates.latitude;
-          lonInput.value = result.coordinates.longitude;
-          status.textContent = 'Uploaded with GPS!';
+        const coords = gpsCoords || result.coordinates;
+
+        // Only extract GPS if BOTH coordinate fields are empty in the form
+        const bothFieldsEmpty = latInput && lonInput && !latInput.value.trim() && !lonInput.value.trim();
+
+        if (coords && bothFieldsEmpty) {
+          // Only update if image has valid coordinates
+          latInput.value = coords.latitude;
+          lonInput.value = coords.longitude;
+          status.textContent = `Uploaded with GPS! (${originalSize}MB → ${compressedSize}MB)`;
         } else {
-          status.textContent = 'Uploaded!';
+          status.textContent = `Uploaded! (${originalSize}MB → ${compressedSize}MB)`;
         }
         status.style.color = 'var(--brand)';
       } else {
@@ -2932,7 +3026,8 @@ function addAddNewCodeRow(codeData = null) {
         status.style.color = 'var(--danger)';
       }
     } catch (error) {
-      status.textContent = 'Network error';
+      console.error('Error uploading:', error);
+      status.textContent = error.message || 'Network error';
       status.style.color = 'var(--danger)';
     }
   });
@@ -3474,32 +3569,26 @@ document.addEventListener('click', function(e) {
           // Remove the code item from the DOM
           editCodeItem.remove();
 
-          // Show success message (optional - you can remove this if you want)
-          // Create a small success notification
-          const successNotif = document.createElement('div');
-          successNotif.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, var(--brand), var(--brand-2));
-            color: #07140c;
-            padding: 12px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
-            z-index: 30000;
-            font-weight: 600;
-            animation: slideIn 0.3s ease;
-          `;
-          successNotif.textContent = 'Code deleted successfully';
-          document.body.appendChild(successNotif);
-
-          setTimeout(() => {
-            successNotif.style.opacity = '0';
-            successNotif.style.transition = 'opacity 0.3s ease';
-            setTimeout(() => document.body.removeChild(successNotif), 300);
-          }, 2000);
+          // Show success alert modal
+          showAlert({
+            type: 'success',
+            title: 'Code Deleted',
+            message: `The code "${codeValue}" has been successfully deleted from ${community}.`,
+            buttons: [{
+              text: 'OK',
+              className: 'btn-alert-primary'
+            }]
+          });
         } else {
-          alert('Error deleting code. Please try again.');
+          showAlert({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete code. Please try again.',
+            buttons: [{
+              text: 'OK',
+              className: 'btn-alert-secondary'
+            }]
+          });
         }
       } catch (error) {
         console.error('Error:', error);

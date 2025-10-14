@@ -66,7 +66,7 @@ require_once __DIR__ . '/includes/header.php';
           </svg>
           <div>
             <div class="link-title">Email Support</div>
-            <div class="link-subtitle">support@gatecodes.app</div>
+            <div class="link-subtitle">blancuniverse@gmail.com</div>
           </div>
         </a>
 
