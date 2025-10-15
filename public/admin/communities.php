@@ -1726,6 +1726,49 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
       grid-template-columns: 1fr;
     }
   }
+
+  /* Google Maps Overrides - Remove system styles without affecting Google's styles */
+  #googleMap {
+    flex: 1;
+    min-height: 400px;
+  }
+
+  #googleMap img {
+    max-width: none !important;
+  }
+
+  /* Remove system button styles from Google Maps controls */
+  #googleMap button {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    border-radius: 0 !important;
+    font: inherit !important;
+  }
+
+  #googleMap button:hover {
+    background: none !important;
+    transform: none !important;
+  }
+
+  /* Allow Google Maps to style its own elements */
+  #googleMap .gm-style img,
+  #googleMap .gm-style button,
+  #googleMap .gm-control-active,
+  #googleMap .gm-svpc,
+  #googleMap .gm-fullscreen-control,
+  #googleMap .gmnoprint,
+  #googleMap .gm-style-cc {
+    background: revert !important;
+    border: revert !important;
+    box-shadow: revert !important;
+    padding: revert !important;
+    margin: revert !important;
+    border-radius: revert !important;
+  }
 </style>
 </head>
 <body>
@@ -2081,6 +2124,30 @@ require_once __DIR__ . '/includes/sidebar.php';
   </div>
 </div>
 
+<!-- MAP PICKER MODAL -->
+<div id="mapPickerModal" class="modal" style="align-items: center; justify-content: center; z-index: 10001;">
+  <div style="background: var(--panel-2); border-radius: 16px; max-width: 900px; width: 95%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+    <div style="padding: 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 1.3rem; color: var(--text);">Pick GPS Coordinates</h2>
+      <button class="btn" id="closeMapPicker" type="button">✕</button>
+    </div>
+    <div style="padding: 16px; background: var(--panel-1);">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" id="mapSearchInput" class="field" placeholder="Search address or place..." style="flex: 1; margin: 0;">
+        <button class="btn btn-primary" id="mapSearchBtn">Search</button>
+      </div>
+      <div id="mapSelectedCoords" style="margin-top: 12px; font-size: 0.9rem; color: var(--muted);">
+        Drag the marker to select coordinates
+      </div>
+    </div>
+    <div id="googleMap" style="flex: 1; min-height: 400px; border: none; box-shadow: none; outline: none;"></div>
+    <div style="padding: 20px; border-top: 1px solid var(--line); display: flex; gap: 12px; justify-content: flex-end;">
+      <button class="btn btn-secondary" id="cancelMapPicker" type="button">Cancel</button>
+      <button class="btn btn-primary" id="confirmMapPicker" type="button">Confirm Location</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT COMMUNITY MODAL -->
 <div id="editModal" class="edit-modal">
   <div class="edit-modal-content">
@@ -2182,7 +2249,16 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
 
         <div class="form-group" style="margin-bottom: 20px;">
-          <label class="form-label">GPS Coordinates (optional)</label>
+          <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span>GPS Coordinates (optional)</span>
+            <a href="#" id="openMapPickerAddNew" style="color: var(--brand); text-decoration: none; font-size: 0.9rem; font-weight: 500;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              Pick on Map
+            </a>
+          </label>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <input type="text" class="field" name="latitude" id="addNewLatitude" placeholder="Latitude (e.g., 28.5383)">
             <input type="text" class="field" name="longitude" id="addNewLongitude" placeholder="Longitude (e.g., -81.3792)">
@@ -2213,6 +2289,8 @@ require_once __DIR__ . '/includes/sidebar.php';
 </div>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCIvxe8bGYtl7IKR4TRilAvDUYiy1PCMHQ&libraries=places"></script>
 
 <script>
 // INDEX.PHP SPECIFIC SCRIPTS
@@ -3869,4 +3947,235 @@ document.addEventListener('click', function(e) {
     });
   }
 });
+
+// ==================== GOOGLE MAPS PICKER ====================
+let map;
+let marker;
+let selectedLat = null;
+let selectedLng = null;
+let geocoder;
+let searchBox;
+let isAddNewMode = false;
+
+const mapPickerModal = document.getElementById('mapPickerModal');
+const openMapPickerBtn = document.getElementById('openMapPicker');
+const closeMapPickerBtn = document.getElementById('closeMapPicker');
+const cancelMapPickerBtn = document.getElementById('cancelMapPicker');
+const confirmMapPickerBtn = document.getElementById('confirmMapPicker');
+const mapSearchInput = document.getElementById('mapSearchInput');
+const mapSearchBtn = document.getElementById('mapSearchBtn');
+const mapSelectedCoords = document.getElementById('mapSelectedCoords');
+
+function initMap(lat = 28.5383355, lng = -81.3792365) {
+  const center = { lat: lat, lng: lng };
+
+  map = new google.maps.Map(document.getElementById('googleMap'), {
+    center: center,
+    zoom: 13,
+    mapTypeControl: true,
+    streetViewControl: true,
+    fullscreenControl: true,
+    zoomControl: true,
+    scaleControl: true,
+    rotateControl: true,
+    disableDefaultUI: false,
+    styles: [] // Sin estilos personalizados, usar estilos default de Google
+  });
+
+  marker = new google.maps.Marker({
+    position: center,
+    map: map,
+    draggable: true,
+    title: 'Drag me to select location',
+    animation: google.maps.Animation.DROP
+  });
+
+  selectedLat = lat;
+  selectedLng = lng;
+  updateCoordsDisplay(lat, lng);
+
+  // Update coordinates when marker is dragged
+  marker.addListener('dragend', function(event) {
+    selectedLat = event.latLng.lat();
+    selectedLng = event.latLng.lng();
+    updateCoordsDisplay(selectedLat, selectedLng);
+  });
+
+  // Click on map to move marker
+  map.addListener('click', function(event) {
+    marker.setPosition(event.latLng);
+    selectedLat = event.latLng.lat();
+    selectedLng = event.latLng.lng();
+    updateCoordsDisplay(selectedLat, selectedLng);
+  });
+
+  geocoder = new google.maps.Geocoder();
+}
+
+function updateCoordsDisplay(lat, lng) {
+  mapSelectedCoords.innerHTML = `
+    <strong style="color: var(--brand);">Selected:</strong>
+    <span style="color: var(--text);">Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}</span>
+  `;
+}
+
+function searchLocation() {
+  const address = mapSearchInput.value.trim();
+  if (!address) return;
+
+  geocoder.geocode({ address: address }, function(results, status) {
+    if (status === 'OK') {
+      const location = results[0].geometry.location;
+      map.setCenter(location);
+      map.setZoom(15);
+      marker.setPosition(location);
+      selectedLat = location.lat();
+      selectedLng = location.lng();
+      updateCoordsDisplay(selectedLat, selectedLng);
+    } else {
+      showAlert({
+        type: 'error',
+        title: 'Location Not Found',
+        message: 'Could not find the location. Please try a different address.',
+        buttons: [
+          {
+            text: 'OK',
+            className: 'btn-alert-primary'
+          }
+        ]
+      });
+    }
+  });
+}
+
+openMapPickerBtn.addEventListener('click', function(e) {
+  e.preventDefault();
+  isAddNewMode = false; // Set to Edit mode
+
+  // Get current coordinates from inputs with proper validation
+  const latValue = document.getElementById('editLatitude').value;
+  const lngValue = document.getElementById('editLongitude').value;
+
+  const parsedLat = parseFloat(latValue);
+  const parsedLng = parseFloat(lngValue);
+
+  const currentLat = (!isNaN(parsedLat) && parsedLat !== 0) ? parsedLat : 28.5383355;
+  const currentLng = (!isNaN(parsedLng) && parsedLng !== 0) ? parsedLng : -81.3792365;
+
+  mapPickerModal.classList.add('open');
+  mapPickerModal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+
+  // Initialize map after modal is visible
+  setTimeout(() => {
+    if (!map) {
+      initMap(currentLat, currentLng);
+    } else {
+      const center = { lat: currentLat, lng: currentLng };
+      map.setCenter(center);
+      marker.setPosition(center);
+      selectedLat = currentLat;
+      selectedLng = currentLng;
+      updateCoordsDisplay(currentLat, currentLng);
+      google.maps.event.trigger(map, 'resize');
+    }
+  }, 100);
+});
+
+function closeMapPickerModal() {
+  mapPickerModal.classList.remove('open');
+  mapPickerModal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+closeMapPickerBtn.addEventListener('click', closeMapPickerModal);
+cancelMapPickerBtn.addEventListener('click', closeMapPickerModal);
+
+mapSearchBtn.addEventListener('click', searchLocation);
+
+mapSearchInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    searchLocation();
+  }
+});
+
+mapPickerModal.addEventListener('click', function(e) {
+  if (e.target === mapPickerModal) {
+    closeMapPickerModal();
+  }
+});
+
+// Add New Modal Map Picker
+const openMapPickerAddNewBtn = document.getElementById('openMapPickerAddNew');
+
+if (openMapPickerAddNewBtn) {
+  openMapPickerAddNewBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    isAddNewMode = true;
+
+    // Get current coordinates from Add New inputs with proper validation
+    const latValue = document.getElementById('addNewLatitude').value;
+    const lngValue = document.getElementById('addNewLongitude').value;
+
+    const parsedLat = parseFloat(latValue);
+    const parsedLng = parseFloat(lngValue);
+
+    const currentLat = (!isNaN(parsedLat) && parsedLat !== 0) ? parsedLat : 28.5383355;
+    const currentLng = (!isNaN(parsedLng) && parsedLng !== 0) ? parsedLng : -81.3792365;
+
+    mapPickerModal.classList.add('open');
+    mapPickerModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // Initialize map after modal is visible
+    setTimeout(() => {
+      if (!map) {
+        initMap(currentLat, currentLng);
+      } else {
+        const center = { lat: currentLat, lng: currentLng };
+        map.setCenter(center);
+        marker.setPosition(center);
+        selectedLat = currentLat;
+        selectedLng = currentLng;
+        updateCoordsDisplay(currentLat, currentLng);
+        google.maps.event.trigger(map, 'resize');
+      }
+    }, 100);
+  });
+}
+
+// Update confirm button to handle both Edit and Add New modes
+const originalConfirmHandler = confirmMapPickerBtn.onclick;
+confirmMapPickerBtn.onclick = null;
+
+confirmMapPickerBtn.addEventListener('click', function() {
+  if (selectedLat !== null && selectedLng !== null) {
+    if (isAddNewMode) {
+      // Add New mode
+      document.getElementById('addNewLatitude').value = selectedLat.toFixed(6);
+      document.getElementById('addNewLongitude').value = selectedLng.toFixed(6);
+      isAddNewMode = false;
+    } else {
+      // Edit mode
+      document.getElementById('editLatitude').value = selectedLat.toFixed(6);
+      document.getElementById('editLongitude').value = selectedLng.toFixed(6);
+    }
+
+    closeMapPickerModal();
+
+    showAlert({
+      type: 'success',
+      title: 'Coordinates Set',
+      message: `GPS coordinates updated successfully!\n\nLat: ${selectedLat.toFixed(6)}\nLng: ${selectedLng.toFixed(6)}`,
+      buttons: [
+        {
+          text: 'OK',
+          className: 'btn-alert-primary'
+        }
+      ]
+    });
+  }
+});
+
 </script>

@@ -4,7 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= $page_title ?? 'Admin Dashboard' ?> · Gate Code</title>
+<script>
+// Apply theme immediately before any rendering to prevent flash
+(function() {
+  try {
+    const savedTheme = localStorage.getItem('theme');
+    const theme = savedTheme ? savedTheme : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    console.log('Theme loaded from localStorage:', savedTheme, 'Applied theme:', theme);
+  } catch (e) {
+    console.error('Error loading theme:', e);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <style>
+  /* Prevent flash of unstyled content */
+  html:not([data-theme]) {
+    visibility: hidden;
+  }
+
+  html[data-theme] {
+    visibility: visible;
+  }
+
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
     --text:#e8eef4; --muted:#93a0ad; --brand:#3bdd82; --brand-2:#1bbf67;

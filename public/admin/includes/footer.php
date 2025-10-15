@@ -86,49 +86,48 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Show flash message on load (backward compatibility)
-const flashMessage = document.getElementById('flashMessage');
-if (flashMessage) {
-  const message = flashMessage.getAttribute('data-message');
-  if (message) {
-    setTimeout(() => {
-      showAlert({
-        type: 'success',
-        title: 'Success',
-        message: message,
-        buttons: [{
-          text: 'OK',
-          className: 'btn-alert-primary',
-          onClick: () => {
-            // Remove flash parameter from URL after closing
-            const url = new URL(window.location);
-            url.searchParams.delete('flash');
-            window.history.replaceState({}, '', url);
-          }
-        }]
-      });
-    }, 100);
-  }
-}
-
-// THEME INITIALIZATION - Apply immediately
-const htmlElement = document.documentElement;
-const savedTheme = localStorage.getItem('theme') || 'dark';
-htmlElement.setAttribute('data-theme', savedTheme);
+// Show flash message on load (backward compatibility) - DISABLED
+// const flashMessage = document.getElementById('flashMessage');
+// if (flashMessage) {
+//   const message = flashMessage.getAttribute('data-message');
+//   if (message) {
+//     setTimeout(() => {
+//       showAlert({
+//         type: 'success',
+//         title: 'Success',
+//         message: message,
+//         buttons: [{
+//           text: 'OK',
+//           className: 'btn-alert-primary',
+//           onClick: () => {
+//             // Remove flash parameter from URL after closing
+//             const url = new URL(window.location);
+//             url.searchParams.delete('flash');
+//             window.history.replaceState({}, '', url);
+//           }
+//         }]
+//       });
+//     }, 100);
+//   }
+// }
 
 // THEME TOGGLE
+const htmlElement = document.documentElement;
+const savedTheme = localStorage.getItem('theme') || 'dark';
 const themeToggle = document.getElementById('themeToggle');
 const moonIcon = document.getElementById('moonIcon');
 const sunIcon = document.getElementById('sunIcon');
 
 if (themeToggle && moonIcon && sunIcon) {
   // Set initial icon state
+  // Dark mode = show sun (to switch to light)
+  // Light mode = show moon (to switch to dark)
   if (savedTheme === 'light') {
-    moonIcon.style.display = 'none';
-    sunIcon.style.display = 'block';
-  } else {
     moonIcon.style.display = 'block';
     sunIcon.style.display = 'none';
+  } else {
+    moonIcon.style.display = 'none';
+    sunIcon.style.display = 'block';
   }
 
   themeToggle.addEventListener('click', () => {
@@ -137,11 +136,11 @@ if (themeToggle && moonIcon && sunIcon) {
     htmlElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     if (newTheme === 'light') {
-      moonIcon.style.display = 'none';
-      sunIcon.style.display = 'block';
-    } else {
       moonIcon.style.display = 'block';
       sunIcon.style.display = 'none';
+    } else {
+      moonIcon.style.display = 'none';
+      sunIcon.style.display = 'block';
     }
   });
 }

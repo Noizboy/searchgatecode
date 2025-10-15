@@ -15,8 +15,8 @@
         ],
         "city": "Lakeland",
         "coordinates": {
-            "latitude": 5555,
-            "longitude": -5555
+            "latitude": 28.321816,
+            "longitude": -81.381734
         },
         "http_url": "http://localhost/gatecodes/admin/communities.php?key=43982"
     },
@@ -89,8 +89,6 @@
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -167,8 +165,6 @@
                 "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -180,13 +176,9 @@
             {
                 "code": "2525#",
                 "notes": "Main entrance",
-                "photo": "assets/gate-call-box-residential.jpg",
-                "report_count": 0,
-                "last_report_at": "2025-10-13T17:58:07+02:00"
+                "photo": "assets/gate-call-box-residential.jpg"
             }
         ],
-        "city": "",
-        "submitted_date": "",
         "coordinates": {
             "latitude": null,
             "longitude": null
