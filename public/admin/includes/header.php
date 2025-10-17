@@ -8,10 +8,13 @@
 // Apply theme immediately before any rendering to prevent flash
 (function() {
   try {
-    const savedTheme = localStorage.getItem('theme');
-    const theme = savedTheme ? savedTheme : 'dark';
+    let theme = localStorage.getItem('theme');
+    // If no theme is saved, default to 'dark' and save it
+    if (!theme) {
+      theme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    }
     document.documentElement.setAttribute('data-theme', theme);
-    console.log('Theme loaded from localStorage:', savedTheme, 'Applied theme:', theme);
   } catch (e) {
     console.error('Error loading theme:', e);
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -208,6 +211,24 @@
     border-radius: 10px;
     min-width: 20px;
     text-align: center;
+  }
+
+  /* Subitem - Gallery under Communities */
+  .nav-subitem {
+    padding-left: 48px;
+    font-size: 0.9rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+
+  /* Show Gallery when hovering Communities OR hovering Gallery itself OR Gallery is active */
+  .nav-item:hover + .nav-subitem,
+  .nav-subitem:hover,
+  .nav-subitem.active {
+    max-height: 50px;
+    opacity: 1;
   }
 
   .sidebar-footer {

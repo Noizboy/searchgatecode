@@ -181,7 +181,7 @@ if ($action === 'upload_json') {
           @copy(GATES_JSON, $backup_file);
         }
         if (write_json(GATES_JSON, $json)) {
-          header('Location: ?key=' . urlencode(ADMIN_KEY) . '&section=backup&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
+          header('Location: ?section=backup&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
           exit;
         } else {
           $msg = 'Failed to write JSON file.';
@@ -254,7 +254,7 @@ if ($action === 'add') {
             $data[$idx]['city'] = $city;
           }
           write_json(GATES_JSON,$data);
-          header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode("Added {$added_count} new code(s) to existing community."));
+          header('Location: ?section=home&flash='.urlencode("Added {$added_count} new code(s) to existing community."));
           exit;
         } else {
           $msg = 'All codes already exist in this community.';
@@ -267,7 +267,7 @@ if ($action === 'add') {
         }
         $data[] = $newCommunity;
         write_json(GATES_JSON,$data);
-        header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community added successfully.'));
+        header('Location: ?section=home&flash='.urlencode('Community added successfully.'));
         exit;
       }
     }
@@ -334,7 +334,7 @@ if ($action === 'update') {
 
       $data[$idx] = $updatedCommunity;
       write_json(GATES_JSON,$data);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community updated successfully.'));
+      header('Location: ?section=home&flash='.urlencode('Community updated successfully.'));
       exit;
     }
   }
@@ -372,7 +372,7 @@ if ($action === 'delete_code') {
         echo json_encode(['success' => true, 'message' => 'Code deleted. Community emptied and removed.']);
         exit;
       }
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
+      header('Location: ?section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
       exit;
     }
     write_json(GATES_JSON,$data);
@@ -383,7 +383,7 @@ if ($action === 'delete_code') {
       echo json_encode(['success' => true, 'message' => $flash]);
       exit;
     }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
+    header('Location: ?section=home&flash='.urlencode($flash));
     exit;
   } else {
     if ($is_ajax) {
@@ -440,7 +440,7 @@ if ($action === 'delete_comm') {
     write_json(GATES_JSON,$data);
     $flash='Community deleted.';
     if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
+    header('Location: ?section=home&flash='.urlencode($flash));
     exit;
   } else {
     $msg='Community not found.';
@@ -499,7 +499,7 @@ if ($action === 'approve_contribution') {
     array_splice($suggestions, $index, 1);
     write_json(SUGGEST_JSON, $suggestions);
 
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution approved successfully.'));
+    header('Location: ?section=contributions&flash='.urlencode('Contribution approved successfully.'));
     exit;
   } else {
     $msg = 'Invalid contribution index.';
@@ -528,7 +528,7 @@ if ($action === 'delete_contribution') {
     array_splice($suggestions, $index, 1);
     write_json(SUGGEST_JSON, $suggestions);
 
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution deleted.'));
+    header('Location: ?section=contributions&flash='.urlencode('Contribution deleted.'));
     exit;
   } else {
     $msg = 'Invalid contribution index.';
@@ -550,7 +550,7 @@ if ($action === 'add_pin') {
       'date' => date('Y-m-d H:i:s')
     ];
     write_json(PIN_JSON, $pins);
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN added successfully.'));
+    header('Location: ?section=settings&flash='.urlencode('PIN added successfully.'));
     exit;
   }
 }
@@ -569,7 +569,7 @@ if ($action === 'update_pin') {
       $pins[$index]['name'] = $name;
       $pins[$index]['pin'] = $pin;
       write_json(PIN_JSON, $pins);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN updated successfully.'));
+      header('Location: ?section=settings&flash='.urlencode('PIN updated successfully.'));
       exit;
     }
   } else {
@@ -585,7 +585,7 @@ if ($action === 'delete_pin') {
   if ($index >= 0 && $index < count($pins)) {
     array_splice($pins, $index, 1);
     write_json(PIN_JSON, $pins);
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN deleted successfully.'));
+    header('Location: ?section=settings&flash='.urlencode('PIN deleted successfully.'));
     exit;
   } else {
     $msg = 'Invalid PIN index.';
@@ -645,6 +645,23 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin Dashboard · Gate Code</title>
+<script>
+// Apply theme immediately before any rendering to prevent flash
+(function() {
+  try {
+    let theme = localStorage.getItem('theme');
+    // If no theme is saved, default to 'dark' and save it
+    if (!theme) {
+      theme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    console.error('Error loading theme:', e);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <style>
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
@@ -1799,7 +1816,7 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="stat-number"><?= $total_communities ?></div>
         <div class="stat-label">Total Communities</div>
-        <a href="communities.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Communities</a>
+        <a href="communities.php?" class="stat-button">View Communities</a>
       </div>
 
       <!-- Pending Contributions -->
@@ -1812,7 +1829,7 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="stat-number"><?= $total_contributions ?></div>
         <div class="stat-label">Pending Contributions</div>
-        <a href="contributions.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Contributions </a>
+        <a href="contributions.php?" class="stat-button">View Contributions </a>
       </div>
 
       <!-- Registered Users -->
@@ -1824,7 +1841,7 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="stat-number"><?= $total_users ?></div>
         <div class="stat-label">Registered Users</div>
-        <a href="users.php?key=<?= urlencode(ADMIN_KEY) ?>" class="stat-button">View Users</a>
+        <a href="users.php?" class="stat-button">View Users</a>
       </div>
 
       <!-- Reported Codes -->
@@ -1836,7 +1853,7 @@ require_once __DIR__ . '/includes/sidebar.php';
         </div>
         <div class="stat-number danger"><?= $total_reported ?></div>
         <div class="stat-label">Reported Codes</div>
-        <a href="communities.php?key=<?= urlencode(ADMIN_KEY) ?>&filter=reported" class="stat-button danger" style="display: inline-block; text-decoration: none; text-align: center;">View Codes</a>
+        <a href="communities.php?filter=reported" class="stat-button danger" style="display: inline-block; text-decoration: none; text-align: center;">View Codes</a>
       </div>
 
       <!-- Total Searches -->
@@ -1911,7 +1928,7 @@ require_once __DIR__ . '/includes/sidebar.php';
       <div class="card">
         <h2 class="card-title">Download Backup</h2>
         <p style="color: var(--muted); margin-bottom: 16px;">Download a backup copy of your gates.json file.</p>
-        <a href="?key=<?= urlencode(ADMIN_KEY) ?>&action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
+        <a href="?action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
       </div>
 
       <div class="card">
@@ -2138,7 +2155,7 @@ const searchBtn = document.getElementById('searchBtn');
 
 searchBtn.addEventListener('click', () => {
   const query = searchInput.value.trim();
-  window.location.href = `?key=${ADMIN_KEY}&section=home&q=${encodeURIComponent(query)}`;
+  window.location.href = `?section=home&q=${encodeURIComponent(query)}`;
 });
 
 searchInput.addEventListener('keypress', (e) => {

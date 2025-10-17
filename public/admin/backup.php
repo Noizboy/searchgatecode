@@ -10,6 +10,25 @@ $data = read_json(GATES_JSON);
 $suggestions = read_json(SUGGEST_JSON);
 $pins = read_json(PIN_JSON);
 
+// CHECK ADMIN ACCESS - Only admins can access backup
+$is_admin = false;
+$current_user_pin = $_SESSION['user_pin'] ?? '';
+
+foreach ($pins as $user) {
+    if ($user['pin'] === $current_user_pin) {
+        if (isset($user['role']) && $user['role'] === 'admin') {
+            $is_admin = true;
+        }
+        break;
+    }
+}
+
+// Redirect if not admin
+if (!$is_admin) {
+    header('Location: index.php?error=' . urlencode('Access denied. Admin privileges required.'));
+    exit;
+}
+
 /******************** ACTIONS ********************/
 
 // DOWNLOAD JSON
@@ -27,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // UPLOAD JSON
   if ($action === 'upload_json') {
     if (!isset($_FILES['json_file']) || $_FILES['json_file']['error'] !== UPLOAD_ERR_OK) {
-      header('Location: backup.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('No file uploaded or upload error'));
+      header('Location: backup.php?error=' . urlencode('No file uploaded or upload error'));
       exit;
     }
 
@@ -36,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newData = json_decode($content, true);
 
     if (!is_array($newData)) {
-      header('Location: backup.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('Invalid JSON file'));
+      header('Location: backup.php?error=' . urlencode('Invalid JSON file'));
       exit;
     }
 
@@ -48,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Write new data
     write_json(GATES_JSON, $newData);
 
-    header('Location: backup.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('JSON uploaded successfully. Previous data backed up.'));
+    header('Location: backup.php?msg=' . urlencode('JSON uploaded successfully. Previous data backed up.'));
     exit;
   }
 }
@@ -82,7 +101,7 @@ require_once __DIR__ . '/includes/header.php';
     <div class="card">
       <h2 class="card-title">Download Backup</h2>
       <p style="color: var(--muted); margin-bottom: 16px;">Download a backup copy of your gates.json file.</p>
-      <a href="?key=<?= urlencode(ADMIN_KEY) ?>&action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
+      <a href="?action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
     </div>
 
     <div class="card">
@@ -90,7 +109,6 @@ require_once __DIR__ . '/includes/header.php';
       <p style="color: var(--muted); margin-bottom: 16px;">Upload a gates.json file to replace the current data. A backup will be created automatically.</p>
 
       <form method="post" enctype="multipart/form-data" id="uploadJsonForm">
-        <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
         <input type="hidden" name="action" value="upload_json">
 
         <div class="file-upload-wrapper">

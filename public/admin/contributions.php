@@ -98,13 +98,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!empty($processedCodes)) {
           if ($idx >= 0) {
-            // Community exists - add codes (avoid duplicates)
-            $existing_codes = array_column($data[$idx]['codes'], 'code');
-            foreach ($processedCodes as $newCode) {
-              if (!in_array($newCode['code'], $existing_codes)) {
-                $data[$idx]['codes'][] = $newCode;
+            // Community exists
+            $isPhotoUpdate = isset($sugg['type']) && $sugg['type'] === 'photo_update';
+
+            if ($isPhotoUpdate) {
+              // For photo_update: Update existing code's photo and coordinates
+              foreach ($processedCodes as $newCode) {
+                $codeFound = false;
+                foreach ($data[$idx]['codes'] as &$existingCode) {
+                  if ($existingCode['code'] === $newCode['code']) {
+                    // Update photo and coordinates of existing code
+                    if (!empty($newCode['photo'])) {
+                      $existingCode['photo'] = $newCode['photo'];
+                    }
+                    $codeFound = true;
+                    break;
+                  }
+                }
+                unset($existingCode);
+
+                // If code doesn't exist, add it (fallback)
+                if (!$codeFound) {
+                  $data[$idx]['codes'][] = $newCode;
+                }
+              }
+
+              // Update coordinates at community level if available
+              if ($communityCoordinates) {
+                $data[$idx]['coordinates'] = $communityCoordinates;
+              }
+            } else {
+              // For new contributions: Add codes (avoid duplicates)
+              $existing_codes = array_column($data[$idx]['codes'], 'code');
+              foreach ($processedCodes as $newCode) {
+                if (!in_array($newCode['code'], $existing_codes)) {
+                  $data[$idx]['codes'][] = $newCode;
+                }
+              }
+
+              // Update coordinates at community level if available and not already set
+              if ($communityCoordinates && !isset($data[$idx]['coordinates'])) {
+                $data[$idx]['coordinates'] = $communityCoordinates;
               }
             }
+
             // Update city if provided
             if ($city !== '') {
               $data[$idx]['city'] = $city;
@@ -112,10 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update submitted_date if provided
             if (!empty($sugg['submitted_date'])) {
               $data[$idx]['submitted_date'] = $sugg['submitted_date'];
-            }
-            // Update coordinates at community level if available and not already set
-            if ($communityCoordinates && !isset($data[$idx]['coordinates'])) {
-              $data[$idx]['coordinates'] = $communityCoordinates;
             }
           } else {
             // New community
@@ -261,6 +294,9 @@ require_once __DIR__ . '/includes/header.php';
               <?php if (!empty($suggestion['city'])): ?>
                 <p class="suggestion-city"><?= htmlspecialchars($suggestion['city']) ?></p>
               <?php endif; ?>
+              <?php if (!empty($suggestion['submitted_by'])): ?>
+                <p class="suggestion-user">👤 Submitted by: <?= htmlspecialchars($suggestion['submitted_by']) ?></p>
+              <?php endif; ?>
               <?php if (!empty($suggestion['submitted_date'])): ?>
                 <p class="suggestion-date">Submitted: <?= htmlspecialchars($suggestion['submitted_date']) ?></p>
               <?php endif; ?>
@@ -307,6 +343,21 @@ require_once __DIR__ . '/includes/header.php';
           </div>
         </div>
 
+        <!-- GPS Coordinates Section -->
+        <div id="gpsCoordinatesSection" style="display: none;">
+          <div class="form-row gps-row">
+            <div class="form-group">
+              <label class="form-label">📍 Latitude</label>
+              <input type="text" class="field" id="displayLatitude" readonly style="background: var(--input-bg-2); cursor: not-allowed; color: var(--brand); font-weight: 600;">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">📍 Longitude</label>
+              <input type="text" class="field" id="displayLongitude" readonly style="background: var(--input-bg-2); cursor: not-allowed; color: var(--brand); font-weight: 600;">
+            </div>
+          </div>
+        </div>
+
         <div class="codes-section">
           <h3 class="section-title">Gate Codes</h3>
           <div id="editCodesList" class="codes-list"></div>
@@ -346,7 +397,7 @@ require_once __DIR__ . '/includes/header.php';
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
-  padding-bottom: 100px;
+  padding-bottom: 20px;
   min-height: 0;
 }
 
@@ -411,6 +462,13 @@ require_once __DIR__ . '/includes/header.php';
 .suggestion-city {
   margin: 0 0 4px 0;
   color: var(--brand);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.suggestion-user {
+  margin: 0 0 4px 0;
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -495,6 +553,7 @@ require_once __DIR__ . '/includes/header.php';
   overflow-x: hidden;
   padding: 24px;
   min-height: 0;
+  max-height: calc(90vh - 160px);
 }
 
 .modal-footer {
@@ -617,10 +676,19 @@ require_once __DIR__ . '/includes/header.php';
 }
 
 @media (max-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr;
+  /* Keep Community Name and City side by side in responsive */
+  .form-row:not(.gps-row) {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
+  /* Keep GPS coordinates side by side in responsive */
+  .form-row.gps-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Gate Code and Notes should stack in responsive */
   .code-row {
     grid-template-columns: 1fr;
   }
@@ -656,16 +724,30 @@ require_once __DIR__ . '/includes/header.php';
   }
 
   .codes-list {
-    max-height: 300px;
+    max-height: 250px;
   }
 
   .modal-box {
     width: 95vw;
-    max-height: 85vh;
+    max-height: 90vh;
   }
 
   .modal-body {
     padding: 16px;
+    max-height: calc(90vh - 140px);
+    overflow-y: auto;
+  }
+
+  .form-label {
+    font-size: 0.85rem;
+  }
+
+  .field {
+    font-size: 14px;
+  }
+
+  .contributions-scroll-wrapper {
+    padding-bottom: 30px;
   }
 }
 
@@ -882,6 +964,25 @@ function openViewModal(index) {
   document.getElementById('editCommunity').value = sugg.community || '';
   document.getElementById('editCity').value = sugg.city || '';
 
+  // Check if any code has GPS coordinates and display them at community level
+  const gpsSection = document.getElementById('gpsCoordinatesSection');
+  const latInput = document.getElementById('displayLatitude');
+  const lonInput = document.getElementById('displayLongitude');
+
+  let hasCoords = false;
+  if (sugg.codes && sugg.codes.length > 0) {
+    for (const code of sugg.codes) {
+      if (code.coordinates && code.coordinates.latitude && code.coordinates.longitude) {
+        latInput.value = code.coordinates.latitude.toFixed(6);
+        lonInput.value = code.coordinates.longitude.toFixed(6);
+        hasCoords = true;
+        break; // Use the first available coordinates
+      }
+    }
+  }
+
+  gpsSection.style.display = hasCoords ? 'block' : 'none';
+
   // Load codes
   const codesList = document.getElementById('editCodesList');
   codesList.innerHTML = '';
@@ -893,10 +994,24 @@ function openViewModal(index) {
     });
   }
 
-  // Display submitted date below codes
+  // Display submitted info below codes
   const submittedDateDisplay = document.getElementById('submittedDateDisplay');
+  let submittedInfo = '';
+
+  if (sugg.submitted_by) {
+    submittedInfo = `👤 Submitted by: ${escapeHtml(sugg.submitted_by)}`;
+  }
+
   if (sugg.submitted_date) {
-    submittedDateDisplay.textContent = `📅 Submitted: ${sugg.submitted_date}`;
+    if (submittedInfo) {
+      submittedInfo += ` • 📅 ${sugg.submitted_date}`;
+    } else {
+      submittedInfo = `📅 Submitted: ${sugg.submitted_date}`;
+    }
+  }
+
+  if (submittedInfo) {
+    submittedDateDisplay.textContent = submittedInfo;
     submittedDateDisplay.style.display = 'block';
   } else {
     submittedDateDisplay.style.display = 'none';
@@ -913,7 +1028,6 @@ function addEditCodeItem(codeData = null) {
   div.dataset.index = index;
 
   const code = codeData || {};
-  const hasCoords = code.coordinates && code.coordinates.latitude && code.coordinates.longitude;
 
   div.innerHTML = `
     <div class="code-header">
@@ -938,12 +1052,6 @@ function addEditCodeItem(codeData = null) {
     ${code.photo ? `
       <div class="code-photo-preview">
         <img src="${resolvePhotoUrl(code.photo)}" alt="Code photo">
-      </div>
-    ` : ''}
-
-    ${hasCoords ? `
-      <div class="code-coords">
-        📍 GPS: ${code.coordinates.latitude.toFixed(6)}, ${code.coordinates.longitude.toFixed(6)}
       </div>
     ` : ''}
   `;

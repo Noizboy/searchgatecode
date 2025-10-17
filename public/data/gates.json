@@ -5,7 +5,16 @@
             {
                 "code": "#4578",
                 "notes": "Keypad at left lane",
-                "photo": "assets/gate_20251003_160316_2a4c80.jpg"
+                "photo": "assets/gate_20251003_160316_2a4c80.jpg",
+                "report_count": 1,
+                "last_report_at": "2025-10-15T06:08:19+02:00",
+                "report_reasons": [
+                    {
+                        "reason": "incorrect",
+                        "reported_at": "2025-10-15T06:08:19+02:00"
+                    }
+                ],
+                "last_report_reason": "incorrect"
             },
             {
                 "code": "#4579",
@@ -469,11 +478,11 @@
             {
                 "code": "222",
                 "notes": "22",
-                "photo": "assets/thumbnailnone.png"
+                "photo": "assets/gate_probando222_20251015_201302_9d6f28.jpg"
             }
         ],
         "city": "",
-        "submitted_date": "",
+        "submitted_date": "2025-10-15 20:13:02",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -499,11 +508,11 @@
             {
                 "code": "www",
                 "notes": "",
-                "photo": "assets/thumbnailnone.png"
+                "photo": "assets/gate_www_20251015_200719_7499fa.jpg"
             }
         ],
         "city": "",
-        "submitted_date": "",
+        "submitted_date": "2025-10-15 20:07:19",
         "coordinates": {
             "latitude": null,
             "longitude": null
@@ -531,6 +540,11 @@
                 "code": "asdsfsdf",
                 "notes": "Testeando",
                 "photo": "assets/temp_gate_20251009_223131_d75ea8.jpg"
+            },
+            {
+                "code": "2222",
+                "notes": "nuevonuevo",
+                "photo": "assets/thumbnailnone.png"
             }
         ],
         "city": "Testeando",
@@ -551,6 +565,22 @@
         ],
         "city": "distrito nacional",
         "submitted_date": "2025-10-09 23:02:05",
+        "coordinates": {
+            "latitude": 28.3217198,
+            "longitude": -81.38180539999999
+        }
+    },
+    {
+        "community": "Oridge",
+        "codes": [
+            {
+                "code": "3456456",
+                "notes": "nuevonuevo",
+                "photo": "assets/gate_oridge_20251015_101409_48ffa1.jpg"
+            }
+        ],
+        "city": "KISSIMMEE",
+        "submitted_date": "2025-10-15 10:14:13",
         "coordinates": {
             "latitude": 28.3217198,
             "longitude": -81.38180539999999

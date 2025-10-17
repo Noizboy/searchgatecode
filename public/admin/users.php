@@ -10,49 +10,122 @@ $data = read_json(GATES_JSON);
 $suggestions = read_json(SUGGEST_JSON);
 $pins = read_json(PIN_JSON);
 
+// GET CURRENT USER ROLE
+$current_user_role = $_SESSION['user_role'] ?? 'user';
+$is_supervisor = ($current_user_role === 'supervisor');
+$is_admin = ($current_user_role === 'admin');
+
 /******************** ACTIONS ********************/
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
 
-  // ADD PIN
+  // ADD USER
   if ($action === 'add_pin') {
     $name = trim($_POST['pin_name'] ?? '');
+    $email = trim($_POST['pin_email'] ?? '');
+    $role = trim($_POST['pin_role'] ?? 'user');
     $pin = trim($_POST['pin_value'] ?? '');
 
-    if ($name === '' || $pin === '') {
-      header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('Name and PIN are required'));
+    // Prevent supervisors from creating admin accounts
+    if ($is_supervisor && $role === 'admin') {
+      header('Location: users.php?error=' . urlencode('You cannot create administrator accounts.'));
       exit;
+    }
+
+    if ($name === '' || $email === '' || $pin === '') {
+      header('Location: users.php?error=' . urlencode('Name, Email and PIN are required'));
+      exit;
+    }
+
+    // Validate email
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      header('Location: users.php?error=' . urlencode('Invalid email address'));
+      exit;
+    }
+
+    // Check if PIN already exists
+    foreach ($pins as $existingPin) {
+      if ($existingPin['pin'] === $pin) {
+        header('Location: users.php?error=' . urlencode('PIN already exists. Please use a different PIN.'));
+        exit;
+      }
+    }
+
+    // Check if email already exists
+    foreach ($pins as $existingPin) {
+      if ($existingPin['email'] === $email) {
+        header('Location: users.php?error=' . urlencode('Email already exists. Please use a different email.'));
+        exit;
+      }
     }
 
     $pins[] = [
       'name' => $name,
       'pin' => $pin,
+      'email' => $email,
+      'role' => $role,
       'date' => date('Y-m-d H:i:s')
     ];
     write_json(PIN_JSON, $pins);
-    header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('PIN added successfully'));
+    header('Location: users.php?msg=' . urlencode('User added successfully'));
     exit;
   }
 
-  // UPDATE PIN
+  // UPDATE USER
   if ($action === 'update_pin') {
     $index = intval($_POST['index'] ?? -1);
     $name = trim($_POST['pin_name'] ?? '');
+    $email = trim($_POST['pin_email'] ?? '');
+    $role = trim($_POST['pin_role'] ?? 'user');
     $pin = trim($_POST['pin_value'] ?? '');
 
     if ($index >= 0 && $index < count($pins)) {
-      if ($name === '' || $pin === '') {
-        header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('Name and PIN are required'));
+      // Prevent supervisors from editing admin accounts
+      if ($is_supervisor && isset($pins[$index]['role']) && $pins[$index]['role'] === 'admin') {
+        header('Location: users.php?error=' . urlencode('You cannot modify administrator accounts.'));
         exit;
+      }
+      // Prevent supervisors from promoting users to admin
+      if ($is_supervisor && $role === 'admin') {
+        header('Location: users.php?error=' . urlencode('You cannot promote users to administrator role.'));
+        exit;
+      }
+      if ($name === '' || $email === '' || $pin === '') {
+        header('Location: users.php?error=' . urlencode('Name, Email and PIN are required'));
+        exit;
+      }
+
+      // Validate email
+      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        header('Location: users.php?error=' . urlencode('Invalid email address'));
+        exit;
+      }
+
+      // Check if PIN already exists (excluding current PIN being edited)
+      foreach ($pins as $idx => $existingPin) {
+        if ($idx !== $index && $existingPin['pin'] === $pin) {
+          header('Location: users.php?error=' . urlencode('PIN already exists. Please use a different PIN.'));
+          exit;
+        }
+      }
+
+      // Check if email already exists (excluding current user being edited)
+      foreach ($pins as $idx => $existingPin) {
+        if ($idx !== $index && $existingPin['email'] === $email) {
+          header('Location: users.php?error=' . urlencode('Email already exists. Please use a different email.'));
+          exit;
+        }
       }
 
       $pins[$index]['name'] = $name;
       $pins[$index]['pin'] = $pin;
+      $pins[$index]['email'] = $email;
+      $pins[$index]['role'] = $role;
       write_json(PIN_JSON, $pins);
-      header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('PIN updated successfully'));
+      header('Location: users.php?msg=' . urlencode('User updated successfully'));
       exit;
     } else {
-      header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('Invalid PIN index'));
+      header('Location: users.php?error=' . urlencode('Invalid user index'));
       exit;
     }
   }
@@ -62,12 +135,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $index = intval($_POST['index'] ?? -1);
 
     if ($index >= 0 && $index < count($pins)) {
+      // Prevent supervisors from deleting admin accounts
+      if ($is_supervisor && isset($pins[$index]['role']) && $pins[$index]['role'] === 'admin') {
+        header('Location: users.php?error=' . urlencode('You cannot delete administrator accounts.'));
+        exit;
+      }
       array_splice($pins, $index, 1);
       write_json(PIN_JSON, $pins);
-      header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('PIN deleted successfully'));
+      header('Location: users.php?msg=' . urlencode('PIN deleted successfully'));
       exit;
     } else {
-      header('Location: users.php?key=' . urlencode(ADMIN_KEY) . '&error=' . urlencode('Invalid PIN index'));
+      header('Location: users.php?error=' . urlencode('Invalid PIN index'));
       exit;
     }
   }
@@ -76,6 +154,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // FLASH MESSAGE
 $flashMsg = $_GET['msg'] ?? '';
 $errorMsg = $_GET['error'] ?? '';
+
+// SEARCH FILTER
+$q = trim($_GET['q'] ?? '');
+$filtered_pins = $pins;
+
+if ($q !== '') {
+  $filtered_pins = array_filter($pins, function($pin) use ($q) {
+    $search = strtolower($q);
+    $name = strtolower($pin['name'] ?? '');
+    $pin_value = strtolower($pin['pin'] ?? '');
+    $email = strtolower($pin['email'] ?? '');
+    $role = strtolower($pin['role'] ?? '');
+
+    return strpos($name, $search) !== false ||
+           strpos($pin_value, $search) !== false ||
+           strpos($email, $search) !== false ||
+           strpos($role, $search) !== false;
+  });
+  $filtered_pins = array_values($filtered_pins); // Re-index array
+}
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -92,52 +190,112 @@ require_once __DIR__ . '/includes/header.php';
     </button>
     <div class="page-header-content">
       <h1 class="page-title">Users</h1>
-      <p class="page-subtitle">Manage user PIN codes for app access</p>
+      <p class="page-subtitle">Manage user accounts and access permissions</p>
     </div>
   </div>
 </div>
 
 <div class="users-container">
   <div class="users-scroll-wrapper">
+    <!-- SEARCH BAR -->
+    <div class="search-section">
+      <div class="search-bar-container">
+        <input type="text" class="field" id="searchInput" placeholder="Search by name or PIN..." value="<?= htmlspecialchars($q) ?>">
+        <button class="btn btn-primary" id="searchBtn">Search</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2 class="card-title">PIN Management</h2>
 
       <div class="pins-grid">
-    <?php if (empty($pins)): ?>
+    <?php if (empty($filtered_pins)): ?>
       <div class="empty-state">
         <div class="empty-state-icon">🔐</div>
-        <p>No PINs configured.</p>
+        <p><?= $q !== '' ? 'No PINs found matching your search.' : 'No PINs configured.' ?></p>
       </div>
-    <?php else: foreach ($pins as $idx => $pin): ?>
+    <?php else:
+      // Need to find original indices for edit/delete operations
+      foreach ($filtered_pins as $pin):
+        // Find the original index in $pins array
+        $original_idx = array_search($pin, $pins, true);
+    ?>
       <div class="pin-item">
         <div class="pin-info">
-          <h3><?= htmlspecialchars($pin['name'] ?? '') ?></h3>
+          <div class="user-header">
+            <h3><?= htmlspecialchars($pin['name'] ?? '') ?></h3>
+            <span class="role-badge role-<?= htmlspecialchars($pin['role'] ?? 'user') ?>">
+              <?= ucfirst(htmlspecialchars($pin['role'] ?? 'user')) ?>
+            </span>
+          </div>
+          <div class="user-details">
+            <div class="detail-item">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="opacity: 0.6;">
+                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+              </svg>
+              <span><?= htmlspecialchars($pin['email'] ?? '') ?></span>
+            </div>
+            <div class="detail-item">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style="opacity: 0.6;">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+              </svg>
+              <span><?= htmlspecialchars($pin['date'] ?? '') ?></span>
+            </div>
+          </div>
           <div class="pin-value"><?= htmlspecialchars($pin['pin'] ?? '') ?></div>
-          <p>Created: <?= htmlspecialchars($pin['date'] ?? '') ?></p>
         </div>
+        <?php
+        // Hide edit/delete buttons for admin users if current user is supervisor
+        $can_modify = !($is_supervisor && ($pin['role'] ?? 'user') === 'admin');
+        ?>
+        <?php if ($can_modify): ?>
         <div class="btn-group">
-          <button class="btn btn-edit-pin" data-index="<?= $idx ?>" data-name="<?= htmlspecialchars($pin['name'] ?? '') ?>" data-pin="<?= htmlspecialchars($pin['pin'] ?? '') ?>">Edit</button>
-          <button type="button" class="btn btn-danger btn-delete-user-pin" data-index="<?= $idx ?>">Delete</button>
+          <button class="btn btn-edit-pin"
+                  data-index="<?= $original_idx ?>"
+                  data-name="<?= htmlspecialchars($pin['name'] ?? '') ?>"
+                  data-email="<?= htmlspecialchars($pin['email'] ?? '') ?>"
+                  data-role="<?= htmlspecialchars($pin['role'] ?? 'user') ?>"
+                  data-pin="<?= htmlspecialchars($pin['pin'] ?? '') ?>">Edit</button>
+          <button type="button" class="btn btn-danger btn-delete-user-pin" data-index="<?= $original_idx ?>">Delete</button>
         </div>
+        <?php else: ?>
+        <div class="btn-group">
+          <span class="protected-badge">Protected</span>
+        </div>
+        <?php endif; ?>
       </div>
     <?php endforeach; endif; ?>
   </div>
 
-      <button class="btn btn-primary" id="addPinBtn" style="margin-top: 20px;">+ Add New PIN</button>
+      <button class="btn btn-primary" id="addPinBtn">+ Add New User</button>
     </div>
 
-    <!-- ADD/EDIT PIN FORM (Hidden by default) -->
+    <!-- ADD/EDIT USER FORM (Hidden by default) -->
     <div class="card" id="pinFormCard" style="display: none;">
-  <h2 class="card-title" id="pinFormTitle">Add New PIN</h2>
+  <h2 class="card-title" id="pinFormTitle">Add New User</h2>
 
   <form method="post" id="pinForm">
-    <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
     <input type="hidden" name="action" value="add_pin" id="pinFormAction">
     <input type="hidden" name="index" value="" id="pinFormIndex">
 
     <div class="form-group">
       <label class="form-label">Name</label>
       <input type="text" class="field" name="pin_name" id="pinName" placeholder="e.g., John Doe" required>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="field" name="pin_email" id="pinEmail" placeholder="e.g., john@example.com" required>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Role</label>
+      <select class="field" name="pin_role" id="pinRole" required>
+        <option value="user">User - Search and contribute only</option>
+        <option value="supervisor">Supervisor - Dashboard access (except Settings & Backup)</option>
+        <option value="admin">Admin - Full dashboard access</option>
+      </select>
     </div>
 
     <div class="form-group">
@@ -154,7 +312,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <div class="btn-group">
-      <button type="submit" class="btn btn-primary">Save PIN</button>
+      <button type="submit" class="btn btn-primary">Save User</button>
       <button type="button" class="btn" id="cancelPinBtn">Cancel</button>
     </div>
   </form>
@@ -169,6 +327,7 @@ require_once __DIR__ . '/includes/header.php';
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  gap: 20px;
 }
 
 .users-scroll-wrapper {
@@ -178,6 +337,26 @@ require_once __DIR__ . '/includes/header.php';
   padding-right: 8px;
   padding-bottom: 100px;
   min-height: 0;
+}
+
+/* SEARCH SECTION - STATIC */
+.search-section {
+  flex-shrink: 0;
+  margin-bottom: 24px;
+}
+
+.search-bar-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-bar-container .field {
+  flex: 1;
+}
+
+.search-bar-container .btn {
+  flex-shrink: 0;
 }
 
 .card {
@@ -220,11 +399,58 @@ require_once __DIR__ . '/includes/header.php';
   gap: 16px;
 }
 
-.pin-info h3 {
-  margin: 0 0 8px 0;
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.user-header h3 {
+  margin: 0;
   color: var(--text);
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.role-admin {
+  background: linear-gradient(135deg, #3bdd82, #2bc76a);
+  color: white;
+}
+
+.role-supervisor {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: white;
+}
+
+.role-user {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .pin-value {
@@ -265,6 +491,20 @@ require_once __DIR__ . '/includes/header.php';
   font-size: 0.85rem;
 }
 
+.protected-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
 @media (max-width: 768px) {
   .pin-item {
     flex-direction: column;
@@ -282,6 +522,26 @@ require_once __DIR__ . '/includes/header.php';
 </style>
 
 <script>
+// Current user role from PHP
+const currentUserRole = '<?= $current_user_role ?>';
+const isSupervisor = (currentUserRole === 'supervisor');
+
+// SEARCH FUNCTIONALITY
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+
+searchBtn.addEventListener('click', () => {
+  const query = searchInput.value.trim();
+  window.location.href = `?q=${encodeURIComponent(query)}`;
+});
+
+searchInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    searchBtn.click();
+  }
+});
+
 // Existing PINs from PHP
 const existingPins = <?= json_encode(array_column($pins, 'pin')) ?>;
 
@@ -361,27 +621,55 @@ const pinValue = document.getElementById('pinValue');
 const cancelPinBtn = document.getElementById('cancelPinBtn');
 const generatePinBtn = document.getElementById('generatePinBtn');
 
+// Validate PIN before form submission
+pinForm.addEventListener('submit', (e) => {
+  const pin = pinValue.value.trim();
+  const action = pinFormAction.value;
+  const currentIndex = pinFormIndex.value;
+
+  // Check if PIN already exists
+  const isDuplicate = existingPins.some((existingPin, idx) => {
+    if (action === 'update_pin' && idx === parseInt(currentIndex)) {
+      return false; // Skip current PIN when editing
+    }
+    return existingPin === pin;
+  });
+
+  if (isDuplicate) {
+    e.preventDefault();
+    showAlert({
+      type: 'error',
+      title: 'Duplicate PIN',
+      message: 'This PIN already exists. Please use a different PIN or click "Generate" for a unique one.',
+      buttons: [{
+        text: 'OK',
+        className: 'btn-alert-primary'
+      }]
+    });
+    return false;
+  }
+});
+
 // Generate PIN button
 generatePinBtn.addEventListener('click', () => {
   const newPin = generateMemorablePIN();
   pinValue.value = newPin;
-  // Add to existing pins to prevent duplicates in same session
-  if (!existingPins.includes(newPin)) {
-    existingPins.push(newPin);
-  }
 });
 
 addPinBtn.addEventListener('click', () => {
-  pinFormTitle.textContent = 'Add New PIN';
+  pinFormTitle.textContent = 'Add New User';
   pinFormAction.value = 'add_pin';
   pinFormIndex.value = '';
   pinName.value = '';
+  pinEmail.value = '';
+  pinRole.value = 'user';
+
+  // Hide admin option for supervisors
+  updateRoleDropdownForSupervisor();
+
   // Auto-generate a PIN when opening form
   const newPin = generateMemorablePIN();
   pinValue.value = newPin;
-  if (!existingPins.includes(newPin)) {
-    existingPins.push(newPin);
-  }
   pinFormCard.style.display = 'block';
   pinFormCard.scrollIntoView({ behavior: 'smooth' });
 });
@@ -390,17 +678,47 @@ cancelPinBtn.addEventListener('click', () => {
   pinFormCard.style.display = 'none';
 });
 
+const pinEmail = document.getElementById('pinEmail');
+const pinRole = document.getElementById('pinRole');
+
+// Function to hide/show admin option based on supervisor status
+function updateRoleDropdownForSupervisor() {
+  if (isSupervisor) {
+    // Hide the admin option for supervisors
+    const adminOption = Array.from(pinRole.options).find(opt => opt.value === 'admin');
+    if (adminOption) {
+      adminOption.style.display = 'none';
+      adminOption.disabled = true;
+    }
+  } else {
+    // Show admin option for admins
+    const adminOption = Array.from(pinRole.options).find(opt => opt.value === 'admin');
+    if (adminOption) {
+      adminOption.style.display = '';
+      adminOption.disabled = false;
+    }
+  }
+}
+
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('btn-edit-pin')) {
     const index = e.target.getAttribute('data-index');
     const name = e.target.getAttribute('data-name');
+    const email = e.target.getAttribute('data-email');
+    const role = e.target.getAttribute('data-role');
     const pin = e.target.getAttribute('data-pin');
 
-    pinFormTitle.textContent = 'Edit PIN';
+    pinFormTitle.textContent = 'Edit User';
     pinFormAction.value = 'update_pin';
     pinFormIndex.value = index;
     pinName.value = name;
+    pinEmail.value = email;
+    pinRole.value = role;
     pinValue.value = pin;
+
+    // Hide admin option for supervisors
+    updateRoleDropdownForSupervisor();
+
     pinFormCard.style.display = 'block';
     pinFormCard.scrollIntoView({ behavior: 'smooth' });
   }
@@ -408,21 +726,29 @@ document.addEventListener('click', (e) => {
   // Copy PIN to clipboard when clicked
   if (e.target.classList.contains('pin-value')) {
     const pinText = e.target.textContent.trim();
+    const originalText = e.target.textContent;
 
     // Copy to clipboard
     navigator.clipboard.writeText(pinText).then(() => {
-      // Add copied class for visual feedback
+      // Change text to "Copied"
+      e.target.textContent = 'Copied';
       e.target.classList.add('copied');
 
-      // Show alert
-      showAlert(`PIN ${pinText} copied to clipboard!`, 'Copied');
-
-      // Remove copied class after animation
+      // Restore original PIN after 2 seconds
       setTimeout(() => {
+        e.target.textContent = originalText;
         e.target.classList.remove('copied');
-      }, 500);
+      }, 2000);
     }).catch(err => {
-      showAlert('Failed to copy PIN', 'Error');
+      showAlert({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to copy PIN to clipboard.',
+        buttons: [{
+          text: 'OK',
+          className: 'btn-alert-primary'
+        }]
+      });
     });
   }
 });
@@ -452,7 +778,6 @@ document.addEventListener('click', (e) => {
             const form = document.createElement('form');
             form.method = 'post';
             form.innerHTML = `
-              <input type="hidden" name="key" value="${ADMIN_KEY}">
               <input type="hidden" name="action" value="delete_pin">
               <input type="hidden" name="index" value="${index}">
             `;

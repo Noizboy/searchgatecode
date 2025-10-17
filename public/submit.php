@@ -1,4 +1,63 @@
 <?php
+// Include config to get version
+require_once __DIR__ . '/admin/includes/config.php';
+
+// Start session for user authentication (if not already started)
+if (session_status() === PHP_SESSION_NONE) {
+  session_start();
+}
+
+// LOAD SETTINGS to check if PIN is required
+$settingsFile = __DIR__ . '/data/settings.json';
+$requirePin = true; // Default to requiring PIN
+$siteTitle = 'Gate Code'; // Default site title
+
+if (file_exists($settingsFile)) {
+  $settingsData = json_decode(file_get_contents($settingsFile), true);
+  if (is_array($settingsData)) {
+    if (isset($settingsData['require_pin'])) {
+      $requirePin = $settingsData['require_pin'];
+    }
+    if (isset($settingsData['site_title'])) {
+      $siteTitle = $settingsData['site_title'];
+    }
+  }
+}
+
+// Check for PIN in URL parameter (from index.php link)
+if (isset($_GET['key'])) {
+  $pinFromUrl = trim($_GET['key']);
+
+  // Load pins from data/pin.json
+  $pinsFile = __DIR__ . '/data/pin.json';
+
+  if (file_exists($pinsFile)) {
+    $pinsData = json_decode(file_get_contents($pinsFile), true);
+
+    if (is_array($pinsData)) {
+      // Find user with matching PIN
+      foreach ($pinsData as $user) {
+        if (isset($user['pin']) && $user['pin'] === $pinFromUrl) {
+          // Authenticate user
+          $_SESSION['user_authenticated'] = true;
+          $_SESSION['user_name'] = $user['name'] ?? 'User';
+          $_SESSION['user_pin'] = $user['pin'];
+          $_SESSION['user_id'] = $user['id'] ?? null;
+          break;
+        }
+      }
+    }
+  }
+
+  // Redirect to clean URL
+  header('Location: submit.php');
+  exit;
+}
+
+// Check if user is logged in OR if PIN is not required
+$isLoggedIn = !$requirePin || (isset($_SESSION['user_authenticated']) && $_SESSION['user_authenticated'] === true);
+$userName = (isset($_SESSION['user_authenticated']) && $_SESSION['user_authenticated'] === true) ? ($_SESSION['user_name'] ?? 'User') : ($requirePin ? null : 'Guest');
+
 // Set Florida timezone
 date_default_timezone_set('America/New_York');
 
@@ -6,7 +65,7 @@ date_default_timezone_set('America/New_York');
 $flashMsg = '';
 $errorMsg = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isLoggedIn) {
   $suggestFile = __DIR__ . '/data/suggest.json';
 
   // Read existing suggestions
@@ -60,7 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $suggestion = [
         'community' => $community,
         'codes' => $codes,
-        'submitted_date' => date('Y-m-d H:i:s')
+        'submitted_date' => date('Y-m-d H:i:s'),
+        'submitted_by' => $userName
       ];
 
       if ($city !== '') {
@@ -90,7 +150,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Submit Community · Gate Code</title>
+<title>Submit Community · <?= htmlspecialchars($siteTitle) ?></title>
+<script>
+// Apply theme immediately before any rendering to prevent flash
+(function() {
+  try {
+    let theme = localStorage.getItem('theme');
+    // If no theme is saved, default to 'dark' and save it
+    if (!theme) {
+      theme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    console.error('Error loading theme:', e);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <style>
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
@@ -121,24 +198,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   html,body{
-    height:100%; margin:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
-    background: var(--bg);
-    transition: background 0.3s ease, color 0.3s ease;
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
+    height:100%; margin:0; padding:0; font-family:system-ui,Segoe UI,Roboto,Arial; color:var(--text);
     background:
       radial-gradient(1000px 500px at 80% -10%, var(--gradient-1) 0%, transparent 60%),
       radial-gradient(900px 400px at -10% 90%, var(--gradient-2) 0%, transparent 55%),
       var(--bg);
+    background-attachment: fixed;
     background-repeat: no-repeat;
-    transition: background 0.3s ease;
+    transition: background 0.3s ease, color 0.3s ease;
   }
-
   body{display:flex;flex-direction:column;min-height:100vh}
 
   main{
@@ -191,13 +259,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   .form-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 16px;
     margin-bottom: 20px;
   }
 
   .form-group {
-    margin-bottom: 20px;
+   /*margin-bottom: 20px;*/
   }
 
   .form-label {
@@ -567,6 +634,164 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     color: var(--danger);
   }
 
+  /* Login Page Styles */
+  .login-container {
+    width: 100%;
+    max-width: 450px;
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 32px;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .login-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(59, 221, 130, 0.2), rgba(27, 191, 103, 0.15));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-icon svg {
+    width: 40px;
+    height: 40px;
+    stroke: var(--brand);
+  }
+
+  .login-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    color: var(--text);
+  }
+
+  .login-subtitle {
+    color: var(--muted);
+    margin-bottom: 32px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .login-form-group {
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .login-form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .login-form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--input-bg-1), var(--input-bg-2));
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    font-size: 16px;
+    box-sizing: border-box;
+    font-family: monospace;
+    letter-spacing: 3px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .login-form-input::placeholder {
+    color: var(--muted);
+    letter-spacing: normal;
+    font-family: system-ui,Segoe UI,Roboto,Arial;
+    font-weight: 400;
+  }
+
+  .login-form-input:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(59, 221, 130, .15);
+  }
+
+  .login-form-input.error {
+    border-color: var(--danger);
+    animation: shake 0.3s ease;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+
+  .login-error-message {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 8px;
+    display: none;
+    text-align: center;
+  }
+
+  .login-error-message.show {
+    display: block;
+  }
+
+  .login-btn {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2FD874, #12B767);
+    border: 0;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(59, 221, 130, .4);
+  }
+
+  .login-btn:hover {
+    background: linear-gradient(135deg, #12B767, #0e9a52);
+    box-shadow: 0 6px 18px rgba(59, 221, 130, .55);
+    transform: translateY(-1px);
+  }
+
+  .login-btn:active {
+    transform: translateY(0);
+  }
+
+  .login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .login-footer {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .login-footer a {
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color .15s ease;
+  }
+
+  .login-footer a:hover {
+    color: var(--brand-2);
+    text-decoration: underline;
+  }
+
   .file-upload-wrapper {
     position: relative;
   }
@@ -633,8 +858,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     .form-row {
-      grid-template-columns: 1fr;
-      gap: 0;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
 
     .code-row {
@@ -775,19 +1000,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </button>
 
   <main>
-    <a href="index.php" class="title">Gate Codes</a>
-    <div class="sub">Submit a new community gate code</div>
+    <a href="index.php" class="title"><?= htmlspecialchars($siteTitle) ?></a>
 
-    <?php if ($errorMsg): ?>
-      <div class="alert alert-error"><?= htmlspecialchars($errorMsg) ?></div>
-    <?php endif; ?>
+    <?php if (!$isLoggedIn): ?>
+      <!-- LOGIN PAGE -->
+      <div class="sub">Enter your PIN to contribute</div>
 
-    <!-- Hidden flash message data for modal -->
-    <?php if ($flashMsg): ?>
-      <div id="flashMessage" data-message="<?= htmlspecialchars($flashMsg) ?>" style="display: none;"></div>
-    <?php endif; ?>
+      <div class="login-container">
+        <div class="login-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
 
-    <form class="form-container" method="POST" id="submitForm">
+        <h2 class="login-title">PIN Authentication</h2>
+        <p class="login-subtitle">Please enter your PIN to submit community gate codes</p>
+
+        <form id="loginForm" method="POST" action="auth_pin.php">
+          <div class="login-form-group">
+            <label class="login-form-label" for="loginPin">Your PIN:</label>
+            <input
+              type="text"
+              id="loginPin"
+              name="pin"
+              class="login-form-input"
+              placeholder="Enter PIN"
+              maxlength="6"
+              autocomplete="off"
+              required
+              autofocus
+            />
+            <div id="loginErrorMessage" class="login-error-message"></div>
+          </div>
+
+          <button type="submit" class="login-btn" id="loginBtn">
+            <span id="loginBtnText">Verify PIN</span>
+          </button>
+        </form>
+
+        <div class="login-footer">
+          <a href="index.php">← Back to Search</a>
+        </div>
+      </div>
+    <?php else: ?>
+      <!-- SUBMIT FORM PAGE -->
+      <div class="sub">Submit a new community gate code</div>
+
+      <?php if ($errorMsg): ?>
+        <div class="alert alert-error"><?= htmlspecialchars($errorMsg) ?></div>
+      <?php endif; ?>
+
+      <!-- Hidden flash message data for modal -->
+      <?php if ($flashMsg): ?>
+        <div id="flashMessage" data-message="<?= htmlspecialchars($flashMsg) ?>" style="display: none;"></div>
+      <?php endif; ?>
+
+      <form class="form-container" method="POST" id="submitForm">
       <h2 class="form-title">Community Information</h2>
 
       <div class="form-row">
@@ -797,7 +1066,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <div class="form-group">
-          <label class="form-label">City Name</label>
+          <label class="form-label">City Name *</label>
           <input type="text" class="field" name="city" placeholder="e.g., Orlando">
         </div>
       </div>
@@ -830,10 +1099,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
     </form>
+    <?php endif; ?>
   </main>
 
   <footer>
     <span>© <?=date('Y')?> Built by <a href="mailto:blancuniverse@gmail.com" class="footer-by">Alejandro</a> | <a href="index.php">Back to Search</a></span>
+    <span style="margin: 0 8px; opacity: 0.5;">•</span>
+    <span style="font-family: 'Courier New', monospace; color: var(--brand); font-weight: 600;">Build v<?= APP_VERSION ?></span>
   </footer>
 
   <!-- Alert Modal -->
@@ -847,6 +1119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </div>
 
 <script>
+const IS_LOGGED_IN = <?= json_encode($isLoggedIn) ?>;
+
 // Alert Modal Functions
 const alertBackdrop = document.getElementById('alertBackdrop');
 const alertIcon = document.getElementById('alertIcon');
@@ -937,36 +1211,118 @@ const moonIcon = document.getElementById('moonIcon');
 const sunIcon = document.getElementById('sunIcon');
 const htmlElement = document.documentElement;
 
-// Load theme from localStorage or default to dark
-const savedTheme = localStorage.getItem('theme') || 'dark';
-htmlElement.setAttribute('data-theme', savedTheme);
-
-if (savedTheme === 'light') {
-  moonIcon.style.display = 'block';
-  sunIcon.style.display = 'none';
-} else {
-  moonIcon.style.display = 'none';
-  sunIcon.style.display = 'block';
+// Function to update theme icon based on current theme
+function updateThemeIcon(theme) {
+  if (moonIcon && sunIcon) {
+    // Dark mode = show sun icon (to switch to light)
+    // Light mode = show moon icon (to switch to dark)
+    if (theme === 'light') {
+      moonIcon.style.display = 'block';
+      sunIcon.style.display = 'none';
+    } else {
+      moonIcon.style.display = 'none';
+      sunIcon.style.display = 'block';
+    }
+  }
 }
 
-// Toggle theme
+// Set initial icon state based on current theme
+const currentTheme = htmlElement.getAttribute('data-theme') || 'dark';
+updateThemeIcon(currentTheme);
+
+// Toggle theme on click
 themeToggle.addEventListener('click', () => {
   const currentTheme = htmlElement.getAttribute('data-theme');
   const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 
+  // Update DOM
   htmlElement.setAttribute('data-theme', newTheme);
+
+  // Save to localStorage
   localStorage.setItem('theme', newTheme);
 
-  if (newTheme === 'light') {
-    moonIcon.style.display = 'block';
-    sunIcon.style.display = 'none';
-  } else {
-    moonIcon.style.display = 'none';
-    sunIcon.style.display = 'block';
-  }
+  // Update icon
+  updateThemeIcon(newTheme);
 });
 
-// Code Management
+// Login Form Handler (only if not logged in)
+if (!IS_LOGGED_IN) {
+  const loginForm = document.getElementById('loginForm');
+  const loginPin = document.getElementById('loginPin');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginBtnText = document.getElementById('loginBtnText');
+  const loginErrorMessage = document.getElementById('loginErrorMessage');
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const pin = loginPin.value.trim();
+
+      if (!pin) {
+        loginPin.classList.add('error');
+        loginErrorMessage.textContent = 'Please enter your PIN';
+        loginErrorMessage.classList.add('show');
+        return;
+      }
+
+      // Disable form
+      loginBtn.disabled = true;
+      loginBtnText.textContent = 'Verifying...';
+      loginPin.disabled = true;
+
+      try {
+        const response = await fetch('auth_pin.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pin: pin })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Login successful - redirect to submit page
+          loginBtnText.textContent = 'Success!';
+          window.location.href = 'submit.php';
+        } else {
+          // Login failed
+          loginPin.classList.add('error');
+          loginErrorMessage.textContent = result.message || 'Invalid PIN. Please try again.';
+          loginErrorMessage.classList.add('show');
+
+          // Re-enable form
+          loginBtn.disabled = false;
+          loginBtnText.textContent = 'Verify PIN';
+          loginPin.disabled = false;
+          loginPin.focus();
+          loginPin.select();
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+
+        loginPin.classList.add('error');
+        loginErrorMessage.textContent = 'Connection error. Please try again.';
+        loginErrorMessage.classList.add('show');
+
+        // Re-enable form
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Verify PIN';
+        loginPin.disabled = false;
+      }
+    });
+
+    // Clear error on input
+    loginPin.addEventListener('input', () => {
+      loginPin.classList.remove('error');
+      loginErrorMessage.classList.remove('show');
+    });
+  }
+}
+
+// Code Management (only if logged in)
+if (IS_LOGGED_IN) {
 let codeCounter = 0;
 
 function createCodeItem(index) {
@@ -1026,17 +1382,23 @@ function createCodeItem(index) {
 
 function addCode() {
   const codesList = document.getElementById('codesList');
-  const codeItem = createCodeItem(codeCounter);
+  const currentCount = codesList.children.length;
+  const codeItem = createCodeItem(currentCount);
   codesList.appendChild(codeItem);
-  codeCounter++;
 }
 
 function updateCodeNumbers() {
   const codeItems = document.querySelectorAll('.code-item');
   codeItems.forEach((item, index) => {
+    item.dataset.index = index;
     const codeNumber = item.querySelector('.code-number');
     if (codeNumber) {
       codeNumber.textContent = `Code #${index + 1}`;
+    }
+    // Update remove button data-index
+    const removeBtn = item.querySelector('.btn-remove-code');
+    if (removeBtn) {
+      removeBtn.dataset.index = index;
     }
   });
 }
@@ -1136,6 +1498,7 @@ document.getElementById('codesList').addEventListener('change', async (e) => {
 
 // Add initial code
 addCode();
+}
 </script>
 </body>
 </html>

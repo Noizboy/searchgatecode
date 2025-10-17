@@ -1,7 +1,7 @@
 <?php
 /******************** CONFIG ********************/
 const ADMIN_KEY   = '43982';
-const APP_VERSION = '1.1.5';
+const APP_VERSION = '1.1.6-beta'; // Role-based auth + Email recovery
 const GATES_JSON  = __DIR__ . '/../../data/gates.json';
 const SUGGEST_JSON = __DIR__ . '/../../data/suggest.json';
 const PIN_JSON = __DIR__ . '/../../data/pin.json';
@@ -15,10 +15,49 @@ define('TEMP_ASSETS_URL', $APP_URL . '/temp_assets/');
 define('ASSETS_RELATIVE', 'assets/');
 define('DEFAULT_THUMB_URL', ASSETS_RELATIVE . DEFAULT_THUMB_FILE);
 
-/* Minimal auth */
+/* Session-based authentication */
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 function require_key(){
-  $k = $_GET['key'] ?? $_POST['key'] ?? '';
-  if ($k !== ADMIN_KEY) { http_response_code(403); exit('Forbidden'); }
+    // Check session-based authentication only
+    if (isset($_SESSION['admin_authenticated']) && $_SESSION['admin_authenticated'] === true) {
+        // Check if user still has admin or supervisor role
+        $pins = read_json(PIN_JSON);
+        $current_pin = $_SESSION['user_pin'] ?? '';
+
+        foreach ($pins as $user) {
+            if ($user['pin'] === $current_pin && isset($user['role']) && in_array($user['role'], ['admin', 'supervisor'])) {
+                return; // Valid admin or supervisor session
+            }
+        }
+    }
+
+    // No valid authentication found, redirect to login
+    header('Location: login.php?error=' . urlencode('Please login to access the admin panel'));
+    exit;
+}
+
+function require_admin_role() {
+    if (!isset($_SESSION['admin_authenticated']) || $_SESSION['admin_authenticated'] !== true) {
+        header('Location: login.php?error=' . urlencode('Admin access required'));
+        exit;
+    }
+
+    $pins = read_json(PIN_JSON);
+    $current_pin = $_SESSION['user_pin'] ?? '';
+
+    foreach ($pins as $user) {
+        if ($user['pin'] === $current_pin && isset($user['role']) && $user['role'] === 'admin') {
+            return true;
+        }
+    }
+
+    // Role no longer admin or user not found
+    session_destroy();
+    header('Location: login.php?error=' . urlencode('Admin privileges required'));
+    exit;
 }
 
 /******************** HELPERS ********************/

@@ -113,35 +113,43 @@ document.addEventListener('keydown', (e) => {
 
 // THEME TOGGLE
 const htmlElement = document.documentElement;
-const savedTheme = localStorage.getItem('theme') || 'dark';
 const themeToggle = document.getElementById('themeToggle');
 const moonIcon = document.getElementById('moonIcon');
 const sunIcon = document.getElementById('sunIcon');
 
-if (themeToggle && moonIcon && sunIcon) {
-  // Set initial icon state
-  // Dark mode = show sun (to switch to light)
-  // Light mode = show moon (to switch to dark)
-  if (savedTheme === 'light') {
-    moonIcon.style.display = 'block';
-    sunIcon.style.display = 'none';
-  } else {
-    moonIcon.style.display = 'none';
-    sunIcon.style.display = 'block';
-  }
-
-  themeToggle.addEventListener('click', () => {
-    const currentTheme = htmlElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    htmlElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    if (newTheme === 'light') {
+// Function to update theme icon based on current theme
+function updateThemeIcon(theme) {
+  if (moonIcon && sunIcon) {
+    // Dark mode = show sun icon (to switch to light)
+    // Light mode = show moon icon (to switch to dark)
+    if (theme === 'light') {
       moonIcon.style.display = 'block';
       sunIcon.style.display = 'none';
     } else {
       moonIcon.style.display = 'none';
       sunIcon.style.display = 'block';
     }
+  }
+}
+
+if (themeToggle && moonIcon && sunIcon) {
+  // Set initial icon state based on current theme
+  const currentTheme = htmlElement.getAttribute('data-theme') || 'dark';
+  updateThemeIcon(currentTheme);
+
+  // Toggle theme on click
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = htmlElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+    // Update DOM
+    htmlElement.setAttribute('data-theme', newTheme);
+
+    // Save to localStorage
+    localStorage.setItem('theme', newTheme);
+
+    // Update icon
+    updateThemeIcon(newTheme);
   });
 }
 

@@ -1,7 +1,23 @@
 [
     {
         "name": "Alejandro",
-        "pin": "11666",
+        "pin": "11111",
+        "email": "alejandro@example.com",
+        "role": "admin",
         "date": "2025-10-13 18:09:48"
+    },
+    {
+        "name": "Jhon",
+        "pin": "22662",
+        "email": "jhon@example.com",
+        "role": "user",
+        "date": "2025-10-15 15:57:07"
+    },
+    {
+        "name": "prueba",
+        "pin": "00000",
+        "email": "asd@email.com",
+        "role": "supervisor",
+        "date": "2025-10-17 04:40:29"
     }
 ]

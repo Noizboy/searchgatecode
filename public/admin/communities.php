@@ -181,7 +181,7 @@ if ($action === 'upload_json') {
           @copy(GATES_JSON, $backup_file);
         }
         if (write_json(GATES_JSON, $json)) {
-          header('Location: ?key=' . urlencode(ADMIN_KEY) . '&section=backup&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
+          header('Location: ?section=backup&flash=' . urlencode('JSON file uploaded successfully. Backup created.'));
           exit;
         } else {
           $msg = 'Failed to write JSON file.';
@@ -268,7 +268,7 @@ if ($action === 'add') {
             $data[$idx]['http_url'] = $http_url;
           }
           write_json(GATES_JSON,$data);
-          header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode("Added {$added_count} new code(s) to existing community."));
+          header('Location: ?section=home&flash='.urlencode("Added {$added_count} new code(s) to existing community."));
           exit;
         } else {
           $msg = 'All codes already exist in this community.';
@@ -295,7 +295,7 @@ if ($action === 'add') {
         }
         $data[] = $newCommunity;
         write_json(GATES_JSON,$data);
-        header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community added successfully.'));
+        header('Location: ?section=home&flash='.urlencode('Community added successfully.'));
         exit;
       }
     }
@@ -369,7 +369,7 @@ if ($action === 'update') {
 
       $data[$idx] = $updatedCommunity;
       write_json(GATES_JSON,$data);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Community updated successfully.'));
+      header('Location: ?section=home&flash='.urlencode('Community updated successfully.'));
       exit;
     }
   }
@@ -400,13 +400,13 @@ if ($action === 'delete_code') {
     if(empty($new)) {
       array_splice($data,$idx,1);
       write_json(GATES_JSON,$data);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
+      header('Location: ?section=home&flash='.urlencode('Code deleted. Community emptied and removed.'));
       exit;
     }
     write_json(GATES_JSON,$data);
     $flash='Code deleted.';
     if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
+    header('Location: ?section=home&flash='.urlencode($flash));
     exit;
   } else {
     $msg='Community not found.';
@@ -431,7 +431,7 @@ if ($action === 'delete_comm') {
     write_json(GATES_JSON,$data);
     $flash='Community deleted.';
     if ($failed) { $flash .= ' (Could not delete: '.implode(', ', $failed).')'; }
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=home&flash='.urlencode($flash));
+    header('Location: ?section=home&flash='.urlencode($flash));
     exit;
   } else {
     $msg='Community not found.';
@@ -489,7 +489,7 @@ if ($action === 'approve_contribution') {
     array_splice($suggestions, $index, 1);
     write_json(SUGGEST_JSON, $suggestions);
 
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution approved successfully.'));
+    header('Location: ?section=contributions&flash='.urlencode('Contribution approved successfully.'));
     exit;
   } else {
     $msg = 'Invalid contribution index.';
@@ -518,7 +518,7 @@ if ($action === 'delete_contribution') {
     array_splice($suggestions, $index, 1);
     write_json(SUGGEST_JSON, $suggestions);
 
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=contributions&flash='.urlencode('Contribution deleted.'));
+    header('Location: ?section=contributions&flash='.urlencode('Contribution deleted.'));
     exit;
   } else {
     $msg = 'Invalid contribution index.';
@@ -540,7 +540,7 @@ if ($action === 'add_pin') {
       'date' => date('Y-m-d H:i:s')
     ];
     write_json(PIN_JSON, $pins);
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN added successfully.'));
+    header('Location: ?section=settings&flash='.urlencode('PIN added successfully.'));
     exit;
   }
 }
@@ -559,7 +559,7 @@ if ($action === 'update_pin') {
       $pins[$index]['name'] = $name;
       $pins[$index]['pin'] = $pin;
       write_json(PIN_JSON, $pins);
-      header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN updated successfully.'));
+      header('Location: ?section=settings&flash='.urlencode('PIN updated successfully.'));
       exit;
     }
   } else {
@@ -575,7 +575,7 @@ if ($action === 'delete_pin') {
   if ($index >= 0 && $index < count($pins)) {
     array_splice($pins, $index, 1);
     write_json(PIN_JSON, $pins);
-    header('Location: ?key='.urlencode(ADMIN_KEY).'&section=settings&flash='.urlencode('PIN deleted successfully.'));
+    header('Location: ?section=settings&flash='.urlencode('PIN deleted successfully.'));
     exit;
   } else {
     $msg = 'Invalid PIN index.';
@@ -627,6 +627,23 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Communities · Admin Dashboard · Gate Code</title>
+<script>
+// Apply theme immediately before any rendering to prevent flash
+(function() {
+  try {
+    let theme = localStorage.getItem('theme');
+    // If no theme is saved, default to 'dark' and save it
+    if (!theme) {
+      theme = 'dark';
+      localStorage.setItem('theme', 'dark');
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    console.error('Error loading theme:', e);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <style>
   :root{
     --bg:#0b0d10; --panel:#151a20; --panel-2:#0f1318;
@@ -641,6 +658,8 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-secondary-hover:#2a3240;
     --footer-bg:rgba(15,19,24,0.5);
     --sidebar-width:260px;
+    --shadow-sm:rgba(0,0,0,0.3);
+    --shadow-md:rgba(0,0,0,0.4);
   }
 
   [data-theme="light"]{
@@ -655,6 +674,8 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     --btn-secondary-bg:#f0f3f6; --btn-secondary-text:#2c3845; --btn-secondary-border:#d1dce5;
     --btn-secondary-hover:#e4e9ed;
     --footer-bg:rgba(255,255,255,0.5);
+    --shadow-sm:rgba(0,0,0,0.08);
+    --shadow-md:rgba(0,0,0,0.12);
   }
 
   * { box-sizing: border-box; }
@@ -1005,6 +1026,14 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     font-weight: 600;
     color: var(--text);
     margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .report-warning-icon {
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
   .code-note {
@@ -1449,6 +1478,17 @@ $filtered = array_values(array_filter($data, fn($r)=>match_row($r,$q)));
     margin-bottom: 12px;
   }
 
+  .edit-code-header h4 {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+  }
+
+  .edit-code-header .report-warning-icon {
+    flex-shrink: 0;
+  }
+
   .edit-code-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1833,13 +1873,13 @@ require_once __DIR__ . '/includes/sidebar.php';
             </svg>
             No GPS
           </button>
-          <button class="btn filter-btn" id="filterDefaultImg" data-filter="default-img">
+          <button class="btn filter-btn" id="filterDefaultImg" data-filter="no-img">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <polyline points="21 15 16 10 5 21"/>
             </svg>
-            Default Image
+            No Image
           </button>
           <button class="btn filter-btn" id="filterReported" data-filter="reported">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1924,9 +1964,9 @@ require_once __DIR__ . '/includes/sidebar.php';
                     <img class="code-thumb js-open-modal" src="<?= htmlspecialchars($p) ?>" alt="" data-full="<?= htmlspecialchars($p) ?>">
                     <div class="code-info">
                       <div class="code-value">
-                        <?= htmlspecialchars($code['code'] ?? '') ?>
+                        <span><?= htmlspecialchars($code['code'] ?? '') ?></span>
                         <?php if(isset($code['report_count']) && $code['report_count'] > 0): ?>
-                          <svg class="report-warning-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; vertical-align: middle; cursor: pointer;" data-report-log='<?= htmlspecialchars(json_encode($code['report_reasons'] ?? []), ENT_QUOTES) ?>' title="<?= $code['report_count'] ?> report(s)">
+                          <svg class="report-warning-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-report-log='<?= htmlspecialchars(json_encode($code['report_reasons'] ?? []), ENT_QUOTES) ?>' title="<?= $code['report_count'] ?> report(s)">
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                             <line x1="12" y1="9" x2="12" y2="13"/>
                             <line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -2030,7 +2070,7 @@ require_once __DIR__ . '/includes/sidebar.php';
       <div class="card">
         <h2 class="card-title">Download Backup</h2>
         <p style="color: var(--muted); margin-bottom: 16px;">Download a backup copy of your gates.json file.</p>
-        <a href="?key=<?= urlencode(ADMIN_KEY) ?>&action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
+        <a href="?action=download_json" class="btn btn-primary" download>📥 Download gates.json</a>
       </div>
 
       <div class="card">
@@ -2332,7 +2372,7 @@ const searchBtn = document.getElementById('searchBtn');
 
 searchBtn.addEventListener('click', () => {
   const query = searchInput.value.trim();
-  window.location.href = `?key=${ADMIN_KEY}&section=home&q=${encodeURIComponent(query)}`;
+  window.location.href = `?section=home&q=${encodeURIComponent(query)}`;
 });
 
 searchInput.addEventListener('keypress', (e) => {
@@ -2350,14 +2390,14 @@ const communityItems = document.querySelectorAll('.community-item');
 // Check URL parameter for filter
 const urlParams = new URLSearchParams(window.location.search);
 const urlFilter = urlParams.get('filter');
-if (urlFilter && ['all', 'no-gps', 'default-img', 'reported'].includes(urlFilter)) {
+if (urlFilter && ['all', 'no-gps', 'no-img', 'reported'].includes(urlFilter)) {
   currentFilter = urlFilter;
 }
 
 // Set initial active state
 const initialBtn = currentFilter === 'all' ? document.getElementById('filterAll') :
                    currentFilter === 'no-gps' ? document.getElementById('filterNoGPS') :
-                   currentFilter === 'default-img' ? document.getElementById('filterDefaultImg') :
+                   currentFilter === 'no-img' ? document.getElementById('filterDefaultImg') :
                    currentFilter === 'reported' ? document.getElementById('filterReported') :
                    document.getElementById('filterAll');
 
@@ -2377,6 +2417,12 @@ filterBtns.forEach(btn => {
     filterBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
+    // Update URL with filter parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('filter', filter);
+    const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+    window.history.pushState({ filter }, '', newUrl);
+
     // Apply filter
     applyFilter(filter);
   });
@@ -2390,7 +2436,7 @@ function applyFilter(filter) {
 
     if (filter === 'no-gps') {
       show = item.dataset.hasGps === '0';
-    } else if (filter === 'default-img') {
+    } else if (filter === 'no-img') {
       show = item.dataset.hasDefaultImg === '1';
     } else if (filter === 'reported') {
       show = item.dataset.hasReported === '1';
@@ -2442,14 +2488,14 @@ function openReportLogModal(reportLog) {
       });
 
       html += `
-        <li style="background: rgba(0,0,0,0.3); padding: 18px; border-radius: 12px; border-left: 4px solid #e53935; display: flex; align-items: start; gap: 16px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.2)'">
-          <div style="flex-shrink: 0; width: 36px; height: 36px; background: linear-gradient(135deg, #e53935, #c62828); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(229, 57, 53, 0.4);">
+        <li style="background: var(--panel-2); padding: 18px; border-radius: 12px; border-left: 4px solid var(--danger-2); display: flex; align-items: start; gap: 16px; box-shadow: 0 2px 8px var(--shadow-sm); border: 1px solid var(--line);">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; background: linear-gradient(135deg, var(--danger), var(--danger-2)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(229, 57, 53, 0.4);">
             ${reportLog.length - idx}
           </div>
           <div style="flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
               <span style="font-weight: 600; color: var(--text); font-size: 1rem;">Report #${reportLog.length - idx}</span>
-              <span style="font-size: 0.85rem; color: var(--muted); background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px;">${dateStr}</span>
+              <span style="font-size: 0.85rem; color: var(--muted); background: var(--input-bg-1); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);">${dateStr}</span>
             </div>
             <div style="color: var(--text); font-size: 0.95rem;">
               <strong>Reason:</strong> ${reasonText}
@@ -2940,10 +2986,10 @@ function escapeHtml(text) {
 }
 
 function addEditCodeRow(codeData = null) {
-  const index = editCodeIndex++;
+  const currentCount = editCodesContainer.children.length;
   const div = document.createElement('div');
   div.className = 'edit-code-item';
-  div.setAttribute('data-edit-index', index);
+  div.setAttribute('data-edit-index', currentCount);
 
   const photoUrl = codeData?.photo ? `<?= ASSETS_URL ?>${codeData.photo.replace('assets/', '')}` : '';
   const code = codeData?.code || '';
@@ -2966,8 +3012,8 @@ function addEditCodeRow(codeData = null) {
 
   div.innerHTML = `
     <div class="edit-code-header">
-      <strong style="color: var(--text);">Code #${index + 1} ${warningIconHtml}</strong>
-      <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${index}" title="Remove Code">
+      <strong style="color: var(--text);">Code #${currentCount + 1} ${warningIconHtml}</strong>
+      <button type="button" class="btn btn-danger btn-remove-edit-code" data-index="${currentCount}" title="Remove Code">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/>
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -2979,26 +3025,54 @@ function addEditCodeRow(codeData = null) {
     <div class="edit-code-grid">
       <div class="form-group">
         <label class="form-label">Code</label>
-        <input type="text" class="field" name="codes[${index}][code]" value="${escapeHtml(code)}" placeholder="e.g., #54839*" required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}">
+        <input type="text" class="field" name="codes[${currentCount}][code]" value="${escapeHtml(code)}" placeholder="e.g., #54839*" required maxlength="8" pattern="[A-Za-z0-9#*]{1,8}">
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <input type="text" class="field" name="codes[${index}][notes]" value="${escapeHtml(notes)}" placeholder="e.g., Main entrance">
+        <input type="text" class="field" name="codes[${currentCount}][notes]" value="${escapeHtml(notes)}" placeholder="e.g., Main entrance">
       </div>
       <div class="form-group edit-code-full">
         <label class="form-label">Photo</label>
-        <input type="file" class="edit-file-input" accept="image/*" id="edit-file-${index}" data-index="${index}">
-        <div class="preview-box ${photoUrl ? 'show' : ''}" id="edit-preview-${index}">
+        <input type="file" class="edit-file-input" accept="image/*" id="edit-file-${currentCount}" data-index="${currentCount}">
+        <div class="preview-box ${photoUrl ? 'show' : ''}" id="edit-preview-${currentCount}">
           <img class="preview-thumb" src="${escapeHtml(photoUrl)}" alt="preview">
         </div>
-        <input type="hidden" name="codes[${index}][photo]" id="edit-photo-${index}" value="${escapeHtml(photo)}">
-        <div class="upload-status" id="edit-status-${index}" style="margin-top: 8px; font-size: 0.85rem;"></div>
+        <input type="hidden" name="codes[${currentCount}][photo]" id="edit-photo-${currentCount}" value="${escapeHtml(photo)}">
+        <div class="upload-status" id="edit-status-${currentCount}" style="margin-top: 8px; font-size: 0.85rem;"></div>
       </div>
     </div>
   `;
 
   editCodesContainer.appendChild(div);
-  wireEditCodeRow(div, index);
+  wireEditCodeRow(div, currentCount);
+}
+
+function updateEditCodeNumbers() {
+  const codeItems = editCodesContainer.querySelectorAll('.edit-code-item');
+  codeItems.forEach((item, index) => {
+    item.dataset.index = index;
+    const header = item.querySelector('.edit-code-header h4');
+    if (!header) {
+      // If no h4, look for strong tag
+      const strong = item.querySelector('.edit-code-header strong');
+      if (strong) {
+        // Extract warning icon HTML if exists
+        const warningIcon = strong.querySelector('.report-warning-icon');
+        const warningIconHtml = warningIcon ? warningIcon.outerHTML : '';
+        strong.innerHTML = `Code #${index + 1} ${warningIconHtml}`;
+      }
+    } else {
+      // h4 exists, update it
+      const warningIcon = header.querySelector('.report-warning-icon');
+      const warningIconHtml = warningIcon ? warningIcon.outerHTML : '';
+      header.innerHTML = `Code #${index + 1} ${warningIconHtml}`;
+    }
+    // Update remove button data-index
+    const removeBtn = item.querySelector('.btn-remove-edit-code');
+    if (removeBtn) {
+      removeBtn.dataset.index = index;
+    }
+  });
 }
 
 function wireEditCodeRow(row, index) {
@@ -3293,13 +3367,14 @@ function createAddNewCodeRow(index) {
 }
 
 function addAddNewCodeRow(codeData = null) {
-  const row = createAddNewCodeRow(addNewCodeIndex);
+  const currentCount = addNewCodesContainer.children.length;
+  const row = createAddNewCodeRow(currentCount);
   addNewCodesContainer.appendChild(row);
 
-  const fileInput = row.querySelector(`#addNewFile-${addNewCodeIndex}`);
-  const preview = row.querySelector(`#addNewPreview-${addNewCodeIndex}`);
-  const photoInput = row.querySelector(`#addNewPhoto-${addNewCodeIndex}`);
-  const status = row.querySelector(`#addNewStatus-${addNewCodeIndex}`);
+  const fileInput = row.querySelector(`#addNewFile-${currentCount}`);
+  const preview = row.querySelector(`#addNewPreview-${currentCount}`);
+  const photoInput = row.querySelector(`#addNewPhoto-${currentCount}`);
+  const status = row.querySelector(`#addNewStatus-${currentCount}`);
   const removeBtn = row.querySelector('.btn-remove-add-code');
 
   fileInput.addEventListener('change', async (e) => {
@@ -3374,16 +3449,20 @@ function addAddNewCodeRow(codeData = null) {
     row.remove();
     updateAddNewCodeNumbers();
   });
-
-  addNewCodeIndex++;
 }
 
 function updateAddNewCodeNumbers() {
   const codeItems = addNewCodesContainer.querySelectorAll('.edit-code-item');
   codeItems.forEach((item, index) => {
+    item.dataset.index = index;
     const header = item.querySelector('.edit-code-header strong');
     if (header) {
       header.textContent = `Code #${index + 1}`;
+    }
+    // Update remove button data-index
+    const removeBtn = item.querySelector('[data-index]');
+    if (removeBtn) {
+      removeBtn.dataset.index = index;
     }
   });
 }
@@ -3911,16 +3990,8 @@ document.addEventListener('click', function(e) {
           // Remove the code item from the DOM
           editCodeItem.remove();
 
-          // Show success alert modal
-          showAlert({
-            type: 'success',
-            title: 'Code Deleted',
-            message: `The code "${codeValue}" has been successfully deleted from ${community}.`,
-            buttons: [{
-              text: 'OK',
-              className: 'btn-alert-primary'
-            }]
-          });
+          // Update code numbers after removal
+          updateEditCodeNumbers();
         } else {
           showAlert({
             type: 'error',

@@ -48,10 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($added_count > 0) {
           write_json(GATES_JSON, $data);
-          header('Location: add_new.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode("$added_count code(s) added to existing community"));
+          header('Location: add_new.php?msg=' . urlencode("$added_count code(s) added to existing community"));
           exit;
         } else {
-          header('Location: add_new.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('All codes already exist in this community'));
+          header('Location: add_new.php?msg=' . urlencode('All codes already exist in this community'));
           exit;
         }
       } else {
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           'codes' => $codes
         ];
         write_json(GATES_JSON, $data);
-        header('Location: add_new.php?key=' . urlencode(ADMIN_KEY) . '&msg=' . urlencode('Community added successfully'));
+        header('Location: add_new.php?msg=' . urlencode('Community added successfully'));
         exit;
       }
     }
@@ -133,7 +133,6 @@ require_once __DIR__ . '/includes/header.php';
 <div class="add-new-container">
   <div class="card add-new-card">
     <form method="post" id="addForm">
-      <input type="hidden" name="key" value="<?= htmlspecialchars(ADMIN_KEY) ?>">
       <input type="hidden" name="action" value="add">
 
       <!-- STATIC HEADER -->
@@ -297,7 +296,6 @@ require_once __DIR__ . '/includes/header.php';
 </style>
 
 <script>
-const ADMIN_KEY = '<?= ADMIN_KEY ?>';
 const ASSETS_URL = '<?= ASSETS_URL ?>';
 
 // ADD CODE ROWS
@@ -396,7 +394,6 @@ function wireCodeRow(row, index) {
     status.style.color = 'var(--muted)';
 
     const fd = new FormData();
-    fd.append('key', ADMIN_KEY);
     fd.append('photo', file);
 
     // Get community name for filename
@@ -406,7 +403,7 @@ function wireCodeRow(row, index) {
     }
 
     try {
-      const response = await fetch(`?ajax=upload&key=${ADMIN_KEY}`, {
+      const response = await fetch(`?ajax=upload`, {
         method: 'POST',
         body: fd
       });
